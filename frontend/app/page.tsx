@@ -11,7 +11,7 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { Reveal } from "@/components/Reveal";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
 import Image from "next/image";
-import HeroBackground from "@/assets/accident-auto-accident-broken-car-accident-wallpaper-preview.jpg";
+import HeroBackground from "@/assets/Hero_bg.jpg";
 import BritamLogo from "@/assets/Britam logo.png";
 import MonarchLogo from "@/assets/Monarch-Logo.png";
 import CicLogo from "@/assets/CIC_Group_Logo.webp";
