@@ -132,7 +132,7 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-ink/40 md:hidden"
+            className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-md md:hidden"
             onClick={() => setMobileOpen(false)}
           >
             <motion.div
@@ -140,35 +140,43 @@ export function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.25 }}
-              className="ml-auto flex h-full w-72 flex-col gap-1 bg-white p-6"
+              className="ml-auto flex h-[calc(90vh-4rem)] w-72 flex-col gap-1 overflow-y-auto bg-white border-l border-b border-brand/80 shadow-2xl rounded-bl-3xl p-6 "
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mb-4 flex items-center justify-between">
-                <span className="font-display text-lg font-extrabold">Somosure</span>
+              <div className="mb-4 flex items-center justify-between bg-brand/80 rounded-full px-2 py-1 text-sm font-medium text-ink-soft">
+                <div className="flex flex-col justify-center items-center">
+                  <Image
+                    src={SomosureLogo}
+                    alt="Somosure"
+                    className="h-8 w-auto"
+                    priority
+                  />
+                  {/* <span className="font-display text-lg font-extrabold text-brand">Somosure</span>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">Insurance</p> */}
+                </div>
                 <button onClick={() => setMobileOpen(false)} aria-label="Close menu">
                   <X className="h-6 w-6" />
                 </button>
               </div>
               {/* <div className="bg-white/90"> */}
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">Insurance</p>
               {INSURANCE_LINKS.map((l) => (
-                <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="rounded-control px-2 py-2.5 text-sm font-medium hover:bg-neutral">
+                <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="rounded-control px-2 py-1 text-sm font-medium hover:bg-neutral">
                   {l.label}
                 </Link>
               ))}
               <div className="my-3 border-t border-neutral-border" />
               {NAV_LINKS.map((l) => (
-                <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="rounded-control px-2 py-2.5 text-sm font-medium hover:bg-neutral">
+                <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="rounded-control px-2 py-1 text-sm font-medium hover:bg-neutral">
                   {l.label}
                 </Link>
               ))}
               {/* </div> */}
-              <div className="mt-auto flex flex-col gap-2 pt-6">
+              <div className="mt-auto flex flex-col items-center gap-2 pt-6">
                 <Link href={accountHref} onClick={() => setMobileOpen(false)}>
-                  <Button variant="ghost" className="w-full">{accountLabel}</Button>
+                  <Button variant="ghost" className="w-full rounded-full">{accountLabel}</Button>
                 </Link>
                 <Link href="/quote/motor" onClick={() => setMobileOpen(false)}>
-                  <Button className="w-full">Get a quote</Button>
+                  <Button className="w-full rounded-full">Get a quote</Button>
                 </Link>
               </div>
             </motion.div>

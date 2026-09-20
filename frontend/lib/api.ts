@@ -1,5 +1,10 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+// Login/register define their own pass/fail around credentials, not
+// session validity - a wrong password there is a normal 401, not an
+// expired session, so those two are excluded from the auto-logout below.
+const AUTH_ENDPOINTS = ["/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh"];
+
 function authHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = window.localStorage.getItem("somosure_access_token");
@@ -11,6 +16,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers: { "Content-Type": "application/json", ...authHeaders(), ...options.headers },
   });
+  if (res.status === 401 && !AUTH_ENDPOINTS.some((p) => path.startsWith(p))) {
+    clearSession();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Your session has expired - please log in again.");
+  }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     throw new Error(detail.detail ?? `Request failed: ${res.status}`);

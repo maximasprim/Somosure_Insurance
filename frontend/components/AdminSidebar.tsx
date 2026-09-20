@@ -134,15 +134,29 @@ export function AdminSidebar() {
     <>
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-neutral-border bg-white md:flex">
-        <div className="flex items-center justify-between border-b border-neutral-border px-5 py-4">
-          <Link href="/admin" className="font-display text-base font-extrabold tracking-tight">
-            {/* Somosure <span className="font-normal text-ink-soft">Admin</span> */}
-            <Image
-              src={SomosureLogo}
-              alt="Somosure"
-              className="h-8 md:h-12 w-auto"
-              priority
-            />
+        <div className="flex items-center justify-between border-b border-neutral-border px-5 py-3">
+          <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
+            {/* Somosure */}
+            <div className="relative inline-block">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{
+                  width: "220%",
+                  height: "220%",
+                  background:
+                    "radial-gradient(circle, rgba(255,204,0,0.95) 0%, rgba(255,204,0,0.55) 30%, rgba(255,204,0,0.20) 55%, transparent 72%)",
+                  filter: "blur(14px)",
+                  zIndex: 0,
+                }}
+              />
+              <Image
+                src={SomosureLogo}
+                alt="Somosure"
+                className="relative z-10 h-6 md:h-8 w-auto"
+                priority
+              />
+            </div>
           </Link>
         </div>
         <NavLinks pathname={pathname} />

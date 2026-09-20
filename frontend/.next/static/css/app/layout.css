@@ -823,11 +823,17 @@ video {
 .left-0 {
   left: 0px;
 }
+.left-1\/2 {
+  left: 50%;
+}
 .right-6 {
   right: 1.5rem;
 }
 .top-0 {
   top: 0px;
+}
+.top-1\/2 {
+  top: 50%;
 }
 .top-40 {
   top: 10rem;
@@ -837,6 +843,9 @@ video {
 }
 .-z-10 {
   z-index: -10;
+}
+.z-10 {
+  z-index: 10;
 }
 .z-40 {
   z-index: 40;
@@ -976,6 +985,9 @@ video {
 .h-96 {
   height: 24rem;
 }
+.h-\[calc\(90vh-4rem\)\] {
+  height: calc(90vh - 4rem);
+}
 .h-full {
   height: 100%;
 }
@@ -1085,6 +1097,14 @@ video {
 .shrink-0 {
   flex-shrink: 0;
 }
+.-translate-x-1\/2 {
+  --tw-translate-x: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.-translate-y-1\/2 {
+  --tw-translate-y: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
 .cursor-pointer {
   cursor: pointer;
 }
@@ -1179,6 +1199,9 @@ video {
 .rounded-full {
   border-radius: 9999px;
 }
+.rounded-bl-3xl {
+  border-bottom-left-radius: 1.5rem;
+}
 .border {
   border-width: 1px;
 }
@@ -1188,6 +1211,9 @@ video {
 }
 .border-b {
   border-bottom-width: 1px;
+}
+.border-l {
+  border-left-width: 1px;
 }
 .border-r {
   border-right-width: 1px;
@@ -1201,6 +1227,9 @@ video {
 }
 .border-brand-deep\/30 {
   border-color: rgb(232 161 0 / 0.3);
+}
+.border-brand\/80 {
+  border-color: rgb(255 197 61 / 0.8);
 }
 .border-neutral-border {
   --tw-border-opacity: 1;
@@ -1241,6 +1270,9 @@ video {
 .bg-brand\/30 {
   background-color: rgb(255 197 61 / 0.3);
 }
+.bg-brand\/80 {
+  background-color: rgb(255 197 61 / 0.8);
+}
 .bg-ink {
   --tw-bg-opacity: 1;
   background-color: rgb(26 29 33 / var(--tw-bg-opacity));
@@ -1280,18 +1312,6 @@ video {
 }
 .bg-white\/90 {
   background-color: rgb(255 255 255 / 0.9);
-}
-.bg-brand\/50 {
-  background-color: rgb(255 197 61 / 0.5);
-}
-.bg-brand\/0 {
-  background-color: rgb(255 197 61 / 0);
-}
-.bg-brand\/90 {
-  background-color: rgb(255 197 61 / 0.9);
-}
-.bg-brand\/40 {
-  background-color: rgb(255 197 61 / 0.4);
 }
 .object-contain {
   -o-object-fit: contain;
@@ -1337,6 +1357,10 @@ video {
 .px-6 {
   padding-left: 1.5rem;
   padding-right: 1.5rem;
+}
+.px-8 {
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 .py-0\.5 {
   padding-top: 0.125rem;
@@ -1416,9 +1440,6 @@ video {
 }
 .pt-6 {
   padding-top: 1.5rem;
-}
-.pt-8 {
-  padding-top: 2rem;
 }
 .text-left {
   text-align: left;
@@ -1548,6 +1569,11 @@ video {
 .opacity-60 {
   opacity: 0.6;
 }
+.shadow-2xl {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
 .shadow-\[0_20px_60px_-15px_rgba\(232\2c 161\2c 0\2c 0\.35\)\] {
   --tw-shadow: 0 20px 60px -15px rgba(232,161,0,0.35);
   --tw-shadow-colored: 0 20px 60px -15px var(--tw-shadow-color);
@@ -1580,6 +1606,10 @@ video {
 }
 .backdrop-blur {
   --tw-backdrop-blur: blur(8px);
+  backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
+}
+.backdrop-blur-md {
+  --tw-backdrop-blur: blur(12px);
   backdrop-filter: var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);
 }
 .backdrop-blur-sm {
@@ -1635,6 +1665,10 @@ video {
 .hover\:bg-neutral:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(244 245 247 / var(--tw-bg-opacity));
+}
+
+.hover\:text-brand\/80:hover {
+  color: rgb(255 197 61 / 0.8);
 }
 
 .hover\:text-ink:hover {
@@ -1748,6 +1782,14 @@ video {
 
   .md\:h-12 {
     height: 3rem;
+  }
+
+  .md\:h-6 {
+    height: 1.5rem;
+  }
+
+  .md\:h-8 {
+    height: 2rem;
   }
 
   .md\:grid-cols-2 {

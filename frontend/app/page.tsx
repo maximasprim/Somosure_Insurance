@@ -18,6 +18,7 @@ import CicLogo from "@/assets/CIC_Group_Logo.webp";
 import PioneerLogo from "@/assets/pioneerlogo1.png";
 import JubileeLogo from "@/assets/jubilee-group-logo.png";
 import ApaLogo from "@/assets/Apa_logo.png";
+import AmarcoLogo from "@/assets/Amarco_logo.png";
 
 const INSURE_OPTIONS = [
   { label: "Car", href: "/quote/motor" },
@@ -91,6 +92,7 @@ const MARKETPLACE_PARTNERS = [
   { name: "Pioneer Insurance", logo: PioneerLogo },
   { name: "Jubilee Insurance", logo: JubileeLogo },
   { name: "APA Insurance", logo: ApaLogo },
+  { name: "Amarco Insurance", logo: AmarcoLogo },
 ];
 
 export default function HomePage() {
@@ -130,8 +132,8 @@ export default function HomePage() {
               Compare, understand, buy and manage your insurance from one trusted platform.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
-              <Link href="/quote/motor"><Button size="lg">Get a quote</Button></Link>
-              <Link href="/contact"><Button size="lg" variant="ghost">Talk to an advisor</Button></Link>
+              <Link href="/quote/motor"><Button className="px-6 py-2 rounded-full">Get a quote</Button></Link>
+              <Link href="/contact"><Button className="px-6 py-2 rounded-full" variant="ghost">Talk to an advisor</Button></Link>
             </div>
           </motion.div>
 
