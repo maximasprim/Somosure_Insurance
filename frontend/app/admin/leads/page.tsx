@@ -52,11 +52,11 @@ export default function LeadsPipelinePage() {
   }
 
   if (error) {
-    return <main className="mx-auto max-w-6xl px-6 py-12"><div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">{error}</div></main>;
+    return <main className="mx-auto max-w-7xl px-6 py-12"><div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">{error}</div></main>;
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">Lead pipeline</h1>
 
       {funnel && (

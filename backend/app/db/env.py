@@ -26,6 +26,7 @@ from app.models import (  # noqa: F401 - registers models on Base.metadata
     policy,
     provider,
     quote,
+    rate_card,
     referral,
     renewal,
     sticker,

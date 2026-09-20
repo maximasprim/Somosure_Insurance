@@ -12,6 +12,7 @@ export interface NormalizedQuote {
   exclusions: Record<string, unknown>;
   deductibles: Record<string, unknown>;
   payment_options: Record<string, unknown>;
+  provider_metadata: Record<string, unknown>;
   is_mock: boolean;
   valid_until: string | null;
 }

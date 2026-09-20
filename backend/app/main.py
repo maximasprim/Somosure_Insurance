@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 import app.models  # noqa: F401 - guarantees every model is registered on
 # Base.metadata regardless of which routes happen to import which model
 # classes directly (see app/models/__init__.py for why this matters).
-from app.api.v1 import admin, admin_claims, admin_content, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
+from app.api.v1 import admin, admin_claims, admin_content, admin_rate_cards, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -45,6 +45,7 @@ app.include_router(quotes.router)
 app.include_router(applications.router)
 app.include_router(policies.router)
 app.include_router(admin.router)
+app.include_router(admin_rate_cards.router)
 app.include_router(payments.router)
 app.include_router(payments.webhook_router)
 app.include_router(me.router)

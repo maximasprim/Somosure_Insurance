@@ -27,6 +27,7 @@ from app.models import (  # noqa: F401
     policy,
     provider,
     quote,
+    rate_card,
     referral,
     renewal,
     sticker,

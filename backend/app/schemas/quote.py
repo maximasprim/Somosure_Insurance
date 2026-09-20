@@ -24,6 +24,7 @@ class NormalizedQuoteOut(BaseModel):
     exclusions: dict
     deductibles: dict
     payment_options: dict
+    provider_metadata: dict = {}
     is_mock: bool
     valid_until: datetime | None
 

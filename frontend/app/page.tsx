@@ -10,6 +10,14 @@ import { Footer } from "@/components/Footer";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { Reveal } from "@/components/Reveal";
 import { AnimatedCounter } from "@/components/AnimatedCounter";
+import Image from "next/image";
+import HeroBackground from "@/assets/accident-auto-accident-broken-car-accident-wallpaper-preview.jpg";
+import BritamLogo from "@/assets/Britam logo.png";
+import MonarchLogo from "@/assets/Monarch-Logo.png";
+import CicLogo from "@/assets/CIC_Group_Logo.webp";
+import PioneerLogo from "@/assets/pioneerlogo1.png";
+import JubileeLogo from "@/assets/jubilee-group-logo.png";
+import ApaLogo from "@/assets/Apa_logo.png";
 
 const INSURE_OPTIONS = [
   { label: "Car", href: "/quote/motor" },
@@ -39,7 +47,7 @@ const STEPS = [
 // current usage.
 const STATS = [
   { value: 7, suffix: "", label: "insurance products" },
-  { value: 3, suffix: "+", label: "insurers compared per quote" },
+  { value: 6, suffix: "+", label: "insurers compared per quote" },
   { value: 2, suffix: " min", label: "average time to a quote", prefix: "< " },
   { value: 60, suffix: "-day", label: "advance renewal reminders" },
 ];
@@ -76,7 +84,14 @@ const TESTIMONIALS = [
 // Labeled honestly to match what's actually integrated today - see
 // docs/PROVIDER_LANDSCAPE.md. Real insurer names/logos are never shown
 // without an actual signed partnership.
-const MARKETPLACE_PARTNERS = ["Demo Insurer A", "Demo Insurer B", "Demo Insurer C", "Demo Aggregator"];
+const MARKETPLACE_PARTNERS = [
+  { name: "Britam Insurance", logo: BritamLogo },
+  { name: "Monarch Insurance", logo: MonarchLogo },
+  { name: "CIC Insurance", logo: CicLogo },
+  { name: "Pioneer Insurance", logo: PioneerLogo },
+  { name: "Jubilee Insurance", logo: JubileeLogo },
+  { name: "APA Insurance", logo: ApaLogo },
+];
 
 export default function HomePage() {
   return (
@@ -84,61 +99,72 @@ export default function HomePage() {
       <Navbar />
 
       {/* Hero */}
-      <section className="relative mx-auto grid max-w-6xl gap-10 px-6 pb-16 pt-14 md:grid-cols-2 md:gap-16 md:px-12 md:pt-24">
+      <section className="relative overflow-hidden">
         {/* Soft decorative blobs - pure CSS, no imagery dependency */}
-        <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -left-32 top-40 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
+        <Image
+          src={HeroBackground}
+          alt="Salvage car"
+          fill
+          priority
+          className="-z-10 object-cover"
+        />
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-brand/30" />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.21, 0.47, 0.32, 0.98] }}
-          className="relative flex flex-col justify-center gap-6"
-        >
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-tint px-3 py-1 text-xs font-semibold text-ink">
-            <ShieldCheck className="h-3.5 w-3.5" /> Licensed insurance marketplace
-          </span>
-          <h1 className="max-w-[14ch] text-4xl font-extrabold leading-[1.05] text-ink md:text-6xl">
-            Insurance made simpler.
-          </h1>
-          <p className="max-w-prose text-lg text-ink-soft">
-            Compare, understand, buy and manage your insurance from one trusted platform.
-          </p>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link href="/quote/motor"><Button size="lg">Get a quote</Button></Link>
-            <Link href="/contact"><Button size="lg" variant="ghost">Talk to an advisor</Button></Link>
-          </div>
-        </motion.div>
+        <div className="mx-auto grid max-w-7xl gap-10 px-6 pb-16 pt-14 md:grid-cols-2 md:gap-16 md:px-12 md:pt-24">
+          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -left-32 top-40 h-72 w-72 rounded-full bg-brand/10 blur-3xl" />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: [0.21, 0.47, 0.32, 0.98] }}
-        >
-          <Card className="relative flex flex-col gap-5 shadow-[0_20px_60px_-15px_rgba(232,161,0,0.35)]">
-            <div>
-              <h2 className="text-xl font-bold">What do you want to insure?</h2>
-              <p className="mt-1 text-sm text-ink-soft">Pick one to start a quote - takes about two minutes.</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.21, 0.47, 0.32, 0.98] }}
+            className="relative flex flex-col justify-center gap-6"
+          >
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-brand-tint px-3 py-1 text-xs font-semibold text-ink">
+              <ShieldCheck className="h-3.5 w-3.5" /> Licensed Insurance Agency
+            </span>
+            <h1 className="max-w-[14ch] text-4xl font-extrabold leading-[1.05] text-white md:text-6xl">
+              Insurance Made Simpler
+            </h1>
+            <p className="max-w-prose text-lg text-white/90">
+              Compare, understand, buy and manage your insurance from one trusted platform.
+            </p>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Link href="/quote/motor"><Button size="lg">Get a quote</Button></Link>
+              <Link href="/contact"><Button size="lg" variant="ghost">Talk to an advisor</Button></Link>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {INSURE_OPTIONS.map((opt, i) => (
-                <motion.div key={opt.label} whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
-                  <Link
-                    href={opt.href}
-                    className="block rounded-control border border-neutral-border px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand-deep hover:bg-brand-tint"
-                  >
-                    {opt.label}
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.7, delay: 0.15, ease: [0.21, 0.47, 0.32, 0.98] }}
+          >
+            <Card className="relative flex flex-col gap-5 shadow-[0_20px_60px_-15px_rgba(232,161,0,0.35)]">
+              <div>
+                <h2 className="text-xl font-bold">What do you want to insure?</h2>
+                <p className="mt-1 text-sm text-ink-soft">Pick one to start a quote - takes about two minutes.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {INSURE_OPTIONS.map((opt, i) => (
+                  <motion.div key={opt.label} whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
+                    <Link
+                      href={opt.href}
+                      className="block rounded-control border border-neutral-border px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand-deep hover:bg-brand-tint"
+                    >
+                      {opt.label}
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        </div>
       </section>
 
       {/* Trust row */}
       <section className="border-y border-neutral-border bg-neutral px-6 py-8 md:px-12">
-        <ul className="mx-auto flex max-w-6xl flex-wrap justify-center gap-x-10 gap-y-3 text-sm font-medium text-ink-soft">
+        <ul className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-10 gap-y-3 text-sm font-medium text-ink-soft">
           {TRUST_ROW.map((item) => (
             <li key={item} className="flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-deep" />
@@ -149,7 +175,7 @@ export default function HomePage() {
       </section>
 
       {/* How it works */}
-      <section className="mx-auto max-w-6xl px-6 py-20 md:px-12">
+      <section className="mx-auto max-w-7xl px-6 py-20 md:px-12">
         <Reveal><h2 className="text-2xl font-bold md:text-3xl">How Somosure works</h2></Reveal>
         <div className="mt-10 grid gap-8 md:grid-cols-3">
           {STEPS.map((s, i) => (
@@ -166,7 +192,7 @@ export default function HomePage() {
 
       {/* Stats */}
       <section className="bg-ink px-6 py-16 md:px-12">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 md:grid-cols-4">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 md:grid-cols-4">
           {STATS.map((s, i) => (
             <Reveal key={s.label} delay={i * 0.08}>
               <p className="font-display text-3xl font-extrabold text-brand md:text-4xl">
@@ -179,7 +205,7 @@ export default function HomePage() {
       </section>
 
       {/* Why Somosure */}
-      <section className="mx-auto max-w-6xl px-6 py-20 md:px-12">
+      <section className="mx-auto max-w-7xl px-6 py-20 md:px-12">
         <Reveal><h2 className="text-2xl font-bold md:text-3xl">Why Somosure</h2></Reveal>
         <div className="mt-10 grid gap-8 sm:grid-cols-2">
           {WHY_SOMOSURE.map((item, i) => (
@@ -199,22 +225,27 @@ export default function HomePage() {
       </section>
 
       {/* Marketplace partners strip */}
-      <section className="border-y border-neutral-border bg-neutral py-10">
+      <section className="border-y border-neutral-border bg-neutral py-8">
         <Reveal>
           <p className="mb-6 text-center text-xs font-semibold uppercase tracking-wide text-ink-soft">
             Comparing quotes from
           </p>
         </Reveal>
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-6">
-          {MARKETPLACE_PARTNERS.map((name) => (
-            <span key={name} className="font-display text-lg font-bold text-ink-soft/60">{name}</span>
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-6 px-6">
+          {MARKETPLACE_PARTNERS.map((partner) => (
+            <Image
+              key={partner.name}
+              src={partner.logo}
+              alt={partner.name}
+              className="h-12 w-auto object-contain opacity-60 grayscale transition hover:opacity-100 hover:grayscale-0"
+            />
           ))}
         </div>
       </section>
 
       {/* Testimonials */}
-      <section className="px-6 py-20 md:px-12">
-        <div className="mx-auto max-w-6xl">
+      <section className="px-6 py-16 md:px-12">
+        <div className="mx-auto max-w-7xl">
           <Reveal><h2 className="text-2xl font-bold md:text-3xl">What customers say</h2></Reveal>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {TESTIMONIALS.map((t, i) => (
@@ -231,12 +262,12 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-6xl px-6 pb-24 md:px-12">
+      <section className="mx-auto max-w-7xl px-6 pb-16 md:px-12">
         <Reveal>
-          <Card className="flex flex-col items-start gap-4 bg-ink text-white md:flex-row md:items-center md:justify-between">
+          <Card className="flex flex-col items-start gap-4 bg-ink text-ink-soft md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-bold">Renewal coming up?</h2>
-              <p className="mt-1 text-sm text-white/70">
+              <h2 className="text-xl font-bold">Renewal Coming Up?</h2>
+              <p className="mt-1 text-sm text-brand-deep/80">
                 We'll pull your policy details and get you fresh quotes before it lapses.
               </p>
             </div>

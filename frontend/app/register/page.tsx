@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { AuthTopbar } from "@/components/AuthTopbar";
 import { api, storeSession } from "@/lib/api";
 
 interface TokenResponse {
@@ -35,7 +36,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col justify-center px-6 py-24">
+    <main className="flex min-h-screen flex-col">
+      <AuthTopbar crossLinkHref="/login" crossLinkLabel="Log in instead" />
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-12">
       <Card>
         <h1 className="text-xl font-bold">Create your account</h1>
         <p className="mt-1 text-sm text-ink-soft">Manage your policies, payments, and claims in one place.</p>
@@ -62,6 +65,7 @@ export default function RegisterPage() {
           </Button>
         </form>
       </Card>
+      </div>
     </main>
   );
 }

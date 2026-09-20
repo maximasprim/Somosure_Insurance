@@ -18,6 +18,7 @@ from app.providers.mock_aggregator import MockAggregatorProvider
 from app.providers.mock_provider import MockProvider
 from app.providers.mtek_adapter import MtekAdapter
 from app.providers.old_mutual_adapter import OldMutualAdapter
+from app.providers.rate_card_adapter import RateCardAdapter
 from app.providers.turaco_adapter import TuracoAdapter
 
 # Keyed by InsuranceProvider.name.lower() - matched against the seeded
@@ -36,6 +37,14 @@ _REAL_ADAPTERS: dict[str, type[InsuranceProviderAdapter]] = {
     "lami technologies": LamiAdapter,
     "mtek services": MtekAdapter,
     "turaco": TuracoAdapter,
+    # Real rate-card-backed providers (spec-extension, Sep 2026): pricing
+    # is computed from an admin-configurable rate card seeded from each
+    # broker's published rating guide - see app/db/rate_card_seed_data.py
+    # and docs/RATE_CARDS.md. A newly added broker just needs a new
+    # InsuranceProvider row with integration_mode="rate_card" and a name
+    # key added here; no other code changes.
+    "amaco (africa merchant assurance co ltd)": RateCardAdapter,
+    "pioneer insurance kenya": RateCardAdapter,
 }
 
 

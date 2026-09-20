@@ -10,8 +10,18 @@ import uuid
 from sqlalchemy import select
 
 from app.core.database import AsyncSessionLocal
+from app.db.rate_card_seed_data import (
+    AMACO_CLASSES,
+    AMACO_PROVIDER_EXTENSIONS,
+    AMACO_SOURCE,
+    PIONEER_CLASSES,
+    PIONEER_PROVIDER_EXTENSIONS,
+    PIONEER_SOURCE,
+    PROVIDERS as RATE_CARD_PROVIDERS,
+)
 from app.models.automation import AutomationRule
 from app.models.provider import InsuranceProvider
+from app.models.rate_card import RateCardExtension, RateCardTier, RateCardVehicleClass
 from app.models.user import Role
 
 ROLES = [
@@ -110,6 +120,94 @@ DEFAULT_RULES = [
 ]
 
 
+_RATE_CARD_SOURCES = {"amaco": (AMACO_SOURCE, AMACO_CLASSES, AMACO_PROVIDER_EXTENSIONS),
+                      "pioneer insurance kenya": (PIONEER_SOURCE, PIONEER_CLASSES, PIONEER_PROVIDER_EXTENSIONS)}
+
+
+async def seed_rate_cards(db) -> tuple[int, int]:
+    """Seeds AMACO and Pioneer Insurance Kenya as real (non-mock)
+    providers backed by RateCardAdapter, plus every vehicle class, tier,
+    and provider-wide extension transcribed from their rate cards (see
+    app/db/rate_card_seed_data.py). Idempotent: safe to re-run, and never
+    overwrites a class/tier an admin has since edited through
+    /api/v1/admin/rate-cards - it only inserts rows that don't exist yet.
+    """
+    providers_created = 0
+    classes_created = 0
+
+    for provider_def in RATE_CARD_PROVIDERS:
+        key = provider_def["key"]
+        provider = await db.scalar(select(InsuranceProvider).where(InsuranceProvider.name == provider_def["name"]))
+        if not provider:
+            provider = InsuranceProvider(
+                id=uuid.uuid4(),
+                name=provider_def["name"],
+                provider_type=provider_def["provider_type"],
+                integration_mode="rate_card",
+                status="active",
+                supports_quote=True,
+                integration_version="rate-card-1.0",
+            )
+            db.add(provider)
+            await db.flush()
+            providers_created += 1
+
+        source_document, class_defs, provider_extensions = _RATE_CARD_SOURCES[key]
+
+        for class_def in class_defs:
+            existing_class = await db.scalar(
+                select(RateCardVehicleClass).where(
+                    RateCardVehicleClass.provider_id == provider.id,
+                    RateCardVehicleClass.code == class_def["code"],
+                )
+            )
+            if existing_class:
+                continue  # never clobber an admin's edits on re-seed
+
+            confidence = "needs_review" if key == "pioneer insurance kenya" else "verified"
+            vehicle_class = RateCardVehicleClass(
+                id=uuid.uuid4(),
+                provider_id=provider.id,
+                product_category="motor",
+                code=class_def["code"],
+                label=class_def["label"],
+                min_sum_insured=class_def.get("min_sum_insured"),
+                max_vehicle_age_years=class_def.get("max_vehicle_age_years"),
+                source_document=source_document,
+                data_confidence=confidence,
+                notes=class_def.get("notes"),
+            )
+            db.add(vehicle_class)
+            await db.flush()
+            classes_created += 1
+
+            for tier_def in class_def["tiers"]:
+                db.add(RateCardTier(id=uuid.uuid4(), vehicle_class_id=vehicle_class.id, **tier_def))
+
+            for ext_def in class_def.get("extensions", []):
+                db.add(
+                    RateCardExtension(
+                        id=uuid.uuid4(),
+                        provider_id=provider.id,
+                        vehicle_class_id=vehicle_class.id,
+                        **ext_def,
+                    )
+                )
+
+        for ext_def in provider_extensions:
+            existing_ext = await db.scalar(
+                select(RateCardExtension).where(
+                    RateCardExtension.provider_id == provider.id,
+                    RateCardExtension.vehicle_class_id.is_(None),
+                    RateCardExtension.code == ext_def["code"],
+                )
+            )
+            if not existing_ext:
+                db.add(RateCardExtension(id=uuid.uuid4(), provider_id=provider.id, vehicle_class_id=None, **ext_def))
+
+    return providers_created, classes_created
+
+
 async def seed() -> None:
     async with AsyncSessionLocal() as db:
         for role_name in ROLES:
@@ -175,11 +273,14 @@ async def seed() -> None:
             if not existing:
                 db.add(AutomationRule(id=uuid.uuid4(), is_active=True, **rule))
 
+        rate_card_providers_created, rate_card_classes_created = await seed_rate_cards(db)
+
         await db.commit()
         print(
             f"Seeded {len(ROLES)} roles, {len(DEMO_PROVIDERS)} demo providers, "
             f"1 demo aggregator, {len(REAL_PROVIDER_CANDIDATES)} real (pending-integration) providers, "
-            f"and {len(DEFAULT_RULES)} automation rules."
+            f"{len(DEFAULT_RULES)} automation rules, and {rate_card_providers_created} rate-card provider(s) "
+            f"with {rate_card_classes_created} vehicle classes (AMACO + Pioneer Insurance Kenya)."
         )
 
 

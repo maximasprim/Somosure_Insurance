@@ -50,7 +50,7 @@ export default function AdminClaimsPage() {
   if (error) return <main className="mx-auto max-w-4xl px-6 py-12 text-status-error">{error}</main>;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">Claims</h1>
       <p className="mt-1 text-ink-soft">Review and progress claims through their lifecycle.</p>
 

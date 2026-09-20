@@ -15,7 +15,7 @@ const publicSans = Public_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Somosure Insurance - Insurance made simpler",
+  title: "Somosure Insurance | Insurance Made Simpler",
   description:
     "Compare, understand, buy and manage your insurance from one trusted platform.",
   metadataBase: new URL("https://somosure.co.ke"),

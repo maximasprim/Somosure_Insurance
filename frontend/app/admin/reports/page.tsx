@@ -53,7 +53,7 @@ export default function ReportsOverviewPage() {
   }));
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Management overview</h1>
         <a href="/api/v1/admin/reports/provider-performance/export.csv" target="_blank" rel="noreferrer">

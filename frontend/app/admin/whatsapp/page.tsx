@@ -39,7 +39,7 @@ export default function WhatsAppInboxPage() {
   if (error) return <main className="mx-auto max-w-4xl px-6 py-12 text-status-error">{error}</main>;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">WhatsApp</h1>
       <p className="mt-1 text-ink-soft">Conversations logged from the WhatsApp webhook, linked to CRM.</p>
 

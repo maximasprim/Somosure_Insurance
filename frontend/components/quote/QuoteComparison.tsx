@@ -45,6 +45,12 @@ export function QuoteComparison({
               {q.is_mock && <Badge tone="neutral">Demo quote</Badge>}
             </div>
 
+            {"data_confidence_notice" in q.coverage && (
+              <p className="rounded-control bg-brand-tint px-3 py-2 text-xs text-ink-soft">
+                {String((q.coverage as { data_confidence_notice?: string }).data_confidence_notice)}
+              </p>
+            )}
+
             <div>
               <p className="text-3xl font-extrabold text-ink">{formatKES(q.total)}</p>
               <p className="text-xs text-ink-soft">

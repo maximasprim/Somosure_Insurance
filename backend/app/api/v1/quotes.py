@@ -52,6 +52,7 @@ async def create_quote_request(payload: QuoteRequestCreate, db: AsyncSession = D
                 exclusions=q.exclusions,
                 deductibles=q.deductibles,
                 payment_options=q.payment_options,
+                provider_metadata=q.provider_metadata,
                 is_mock=q.is_mock,
                 valid_until=q.valid_until,
             )

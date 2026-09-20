@@ -52,7 +52,7 @@ export default function StickerQueuePage() {
   if (error) return <main className="mx-auto max-w-4xl px-6 py-12 text-status-error">{error}</main>;
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">Sticker issuance queue</h1>
       <p className="mt-1 text-ink-soft">
         Motor stickers auto-generate when a policy activates. Move each one through validation, generation, and

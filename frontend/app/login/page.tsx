@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { AuthTopbar } from "@/components/AuthTopbar";
 import { api, storeSession, getTokenRole } from "@/lib/api";
 
 interface TokenResponse {
@@ -29,7 +30,7 @@ export default function LoginPage() {
       storeSession(res.access_token, res.refresh_token);
       const role = getTokenRole();
       const staffRoles = ["super_admin", "operations", "management", "underwriter", "claims_officer", "finance_officer"];
-      router.push(role && staffRoles.includes(role) ? "/admin/applications" : "/dashboard");
+      router.push(role && staffRoles.includes(role) ? "/admin" : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -38,7 +39,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-md flex-col justify-center px-6 py-24">
+    <main className="flex min-h-screen flex-col">
+      <AuthTopbar crossLinkHref="/register" crossLinkLabel="Create an account" />
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-12">
       <Card>
         <h1 className="text-xl font-bold">Log in</h1>
         <p className="mt-1 text-sm text-ink-soft">Staff and customer accounts use the same login.</p>
@@ -57,6 +60,7 @@ export default function LoginPage() {
           </Button>
         </form>
       </Card>
+      </div>
     </main>
   );
 }

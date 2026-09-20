@@ -1,10 +1,15 @@
 "use client";
+import SomosureLogo from "@/assets/somosure_logo.png";
+import Image from "next/image";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { isLoggedIn, getTokenRole } from "@/lib/api";
+
+const STAFF_ROLES = ["super_admin", "operations", "management", "underwriter", "claims_officer", "finance_officer"];
 
 const INSURANCE_LINKS = [
   { label: "Motor", href: "/quote/motor" },
@@ -28,6 +33,8 @@ export function Navbar() {
   const [insuranceOpen, setInsuranceOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [accountHref, setAccountHref] = useState("/login");
+  const [accountLabel, setAccountLabel] = useState("Log in");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -36,15 +43,32 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    const role = getTokenRole();
+    if (role && STAFF_ROLES.includes(role)) {
+      setAccountHref("/admin");
+      setAccountLabel("Admin");
+    } else {
+      setAccountHref("/dashboard");
+      setAccountLabel("My account");
+    }
+  }, []);
+
   return (
     <nav
-      className={`sticky top-0 z-40 border-b transition-colors ${
-        scrolled ? "border-neutral-border bg-white/90 backdrop-blur" : "border-transparent bg-white/60 backdrop-blur-sm"
-      }`}
+      className={`sticky top-0 z-40 border-b transition-colors ${scrolled ? "border-neutral-border bg-brand-tint/90 backdrop-blur" : "border-transparent bg-brand backdrop-blur-sm"
+        }`}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-12">
+      <div className="mx-auto flex max-w-8xl items-center justify-between px-2 py-2 md:px-3">
         <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
-          Somosure
+          {/* Somosure */}
+          <Image
+            src={SomosureLogo}
+            alt="Somosure"
+            className="h-8 md:h-12 w-auto"
+            priority
+          />
         </Link>
 
         <div className="hidden items-center gap-8 text-sm font-medium text-ink-soft md:flex">
@@ -86,10 +110,10 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="hidden text-sm font-medium text-ink-soft hover:text-ink md:block">
-            My account
+          <Link href={accountHref} className="hidden text-sm font-medium text-ink-soft hover:text-ink md:block">
+            {accountLabel}
           </Link>
-          <Link href="/quote/motor" className="hidden md:block">
+          <Link href="/quote/motor" className="hidden md:block ">
             <Button size="md">Get a quote</Button>
           </Link>
           <button
@@ -125,6 +149,7 @@ export function Navbar() {
                   <X className="h-6 w-6" />
                 </button>
               </div>
+              {/* <div className="bg-white/90"> */}
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">Insurance</p>
               {INSURANCE_LINKS.map((l) => (
                 <Link key={l.href} href={l.href} onClick={() => setMobileOpen(false)} className="rounded-control px-2 py-2.5 text-sm font-medium hover:bg-neutral">
@@ -137,9 +162,10 @@ export function Navbar() {
                   {l.label}
                 </Link>
               ))}
+              {/* </div> */}
               <div className="mt-auto flex flex-col gap-2 pt-6">
-                <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
-                  <Button variant="ghost" className="w-full">My account</Button>
+                <Link href={accountHref} onClick={() => setMobileOpen(false)}>
+                  <Button variant="ghost" className="w-full">{accountLabel}</Button>
                 </Link>
                 <Link href="/quote/motor" onClick={() => setMobileOpen(false)}>
                   <Button className="w-full">Get a quote</Button>
