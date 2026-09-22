@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
+import hashlib
+import secrets
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -19,6 +21,23 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
+
+
+def generate_reset_token() -> str:
+    """A high-entropy (256-bit) URL-safe random string - this is what
+    goes in the emailed reset link, never stored anywhere itself."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(raw_token: str) -> str:
+    """Reset tokens are already high-entropy random values (unlike a
+    user-chosen password), so a fast deterministic hash is the right
+    tool here rather than bcrypt - bcrypt also silently truncates input
+    past 72 bytes, which a 43-character token could hit combined with
+    any future prefixing. sha256 has no such limit and is the standard
+    choice for this exact "hash a random token for DB lookup" pattern.
+    """
+    return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
 def create_token(subject: str, expires_delta: timedelta, extra_claims: dict[str, Any] | None = None) -> str:

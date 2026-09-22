@@ -1,21 +1,43 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    generate_reset_token,
     hash_password,
+    hash_reset_token,
     verify_password,
 )
 from app.models.customer import Customer
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user import Role, User, UserRole
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserOut
+from app.notifications.registry import get_dispatcher
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserOut,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+settings = get_settings()
+
+# Long enough that a customer opening an email an hour later isn't
+# punished, short enough that a leaked/intercepted link doesn't stay
+# useful indefinitely.
+RESET_TOKEN_TTL = timedelta(minutes=30)
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -102,3 +124,61 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
         access_token=create_access_token(str(user.id), role_name),
         refresh_token=create_refresh_token(str(user.id)),
     )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Always returns the same generic response whether or not the email
+    is registered - this is deliberate (see ForgotPasswordResponse) and
+    is not a bug if you're testing with an email that doesn't exist.
+
+    No real email provider is configured in this codebase yet (see
+    app/notifications/base.py) - MockDispatcher logs the reset link at
+    INFO level instead of delivering it. Check the backend's console
+    output for a line starting "[MOCK EMAIL]" to get the link while
+    testing. Configuring a real email dispatcher later requires no
+    changes here - only a new NotificationDispatcher implementation and
+    a registry.py update, exactly like AfricasTalkingDispatcher for SMS.
+    """
+    user = await db.scalar(select(User).where(User.email == payload.email))
+    if user and user.is_active:
+        raw_token = generate_reset_token()
+        db.add(
+            PasswordResetToken(
+                user_id=user.id,
+                token_hash=hash_reset_token(raw_token),
+                expires_at=datetime.now(timezone.utc) + RESET_TOKEN_TTL,
+            )
+        )
+        await db.commit()
+
+        reset_link = f"{settings.frontend_base_url}/reset-password?token={raw_token}"
+        await get_dispatcher().send_email(
+            user.email,
+            "Reset your Somosure password",
+            f"Hi {user.full_name},\n\nUse the link below to set a new password. "
+            f"It expires in 30 minutes and can only be used once.\n\n{reset_link}\n\n"
+            "If you didn't request this, you can safely ignore this email.",
+        )
+
+    return ForgotPasswordResponse()
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("10/minute")
+async def reset_password(request: Request, payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    token_row = await db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_reset_token(payload.token))
+    )
+    now = datetime.now(timezone.utc)
+    if not token_row or token_row.used_at is not None or token_row.expires_at < now:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset link is invalid or has expired")
+
+    user = await db.get(User, token_row.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset link is invalid or has expired")
+
+    user.hashed_password = hash_password(payload.new_password)
+    token_row.used_at = now
+    await db.commit()

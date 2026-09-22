@@ -23,6 +23,7 @@ from app.models import (  # noqa: F401
     financing,
     notification,
     partner,
+    password_reset_token,
     payment,
     policy,
     provider,

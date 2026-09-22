@@ -22,6 +22,10 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
+    # Used to build links inside emails/SMS sent to users (password reset,
+    # etc.) - the frontend origin, not the API's own.
+    frontend_base_url: str = "http://localhost:3000"
+
     # Error monitoring (spec §2, §30). Only initializes if a real DSN is
     # configured - never fabricates monitoring activity. Get a project DSN
     # from sentry.io and set SENTRY_DSN in backend/.env to enable.

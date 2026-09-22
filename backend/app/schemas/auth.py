@@ -33,3 +33,19 @@ class UserOut(BaseModel):
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    # Deliberately generic regardless of whether the email exists - a
+    # different message for "no such account" would let anyone probe
+    # which emails are registered.
+    message: str = "If an account exists for that email, we've sent password reset instructions."
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)

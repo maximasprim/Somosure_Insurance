@@ -1,0 +1,76 @@
+# Render Blueprint - backend + database only. The frontend deploys
+# separately on Vercel (see SOMOSURE_VERCEL_RENDER_DEPLOYMENT.md), so it's
+# deliberately not listed here.
+#
+# In the Render dashboard: New -> Blueprint -> point it at this repo.
+# Values marked `sync: false` still need to be filled in by hand - Render
+# blueprints don't auto-fill secrets.
+
+databases:
+  - name: somosure-db
+    plan: free
+    postgresMajorVersion: 16
+
+services:
+  - type: web
+    name: somosure-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    port: 8000
+    healthCheckPath: /health
+    # Runs once before each deploy goes live. Alembic no-ops if the DB is
+    # already at head, so this is safe to leave in place permanently
+    # rather than running migrations by hand after every deploy.
+    preDeployCommand: alembic -c app/db/alembic.ini upgrade head
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: somosure-db
+          property: connectionString
+        # NOTE: Render's connectionString comes back as postgresql://... -
+        # after the blueprint creates it, edit this one field by hand to
+        # postgresql+asyncpg://... (the app's SQLAlchemy setup needs the
+        # async driver prefix).
+      - key: REDIS_URL
+        value: redis://localhost:6379/0
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "14"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: somosure-documents
+      - key: CORS_ORIGINS
+        sync: false
+        # Set this AFTER your Vercel deploy exists, to your real Vercel
+        # URL(s), e.g. https://somosure.vercel.app - comma-separate if you
+        # keep a custom domain too.
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: AFRICASTALKING_API_KEY
+        sync: false
+      - key: AFRICASTALKING_USERNAME
+        sync: false
+      - key: BRITAM_API_BASE_URL
+        sync: false
+      - key: BRITAM_API_KEY
+        sync: false
+      - key: JUBILEE_API_BASE_URL
+        sync: false
+      - key: JUBILEE_API_KEY
+        sync: false

@@ -868,6 +868,9 @@ video {
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
 }
+.-mt-2 {
+  margin-top: -0.5rem;
+}
 .mb-2 {
   margin-bottom: 0.5rem;
 }
@@ -1174,6 +1177,9 @@ video {
 }
 .gap-y-6 {
   row-gap: 1.5rem;
+}
+.self-end {
+  align-self: flex-end;
 }
 .overflow-hidden {
   overflow: hidden;
@@ -1566,6 +1572,9 @@ video {
 .text-white\/90 {
   color: rgb(255 255 255 / 0.9);
 }
+.underline {
+  text-decoration-line: underline;
+}
 .opacity-60 {
   opacity: 0.6;
 }
@@ -1782,10 +1791,6 @@ video {
 
   .md\:h-12 {
     height: 3rem;
-  }
-
-  .md\:h-6 {
-    height: 1.5rem;
   }
 
   .md\:h-8 {

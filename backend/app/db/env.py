@@ -22,6 +22,7 @@ from app.models import (  # noqa: F401 - registers models on Base.metadata
     financing,
     notification,
     partner,
+    password_reset_token,
     payment,
     policy,
     provider,
