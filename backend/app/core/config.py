@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     # etc.) - the frontend origin, not the API's own.
     frontend_base_url: str = "http://localhost:3000"
 
+    # Real email delivery via a standard SMTP account (a work email
+    # inbox, not a dedicated transactional-email service) - see
+    # .env.example for setup notes. Left blank, email falls back to
+    # MockDispatcher (logs instead of sending).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Somosure"
+    smtp_use_tls: bool = True
+
     # Error monitoring (spec §2, §30). Only initializes if a real DSN is
     # configured - never fabricates monitoring activity. Get a project DSN
     # from sentry.io and set SENTRY_DSN in backend/.env to enable.

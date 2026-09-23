@@ -20,14 +20,18 @@ import JubileeLogo from "@/assets/jubilee-group-logo.png";
 import ApaLogo from "@/assets/Apa_logo.png";
 import AmarcoLogo from "@/assets/Amarco_logo.png";
 
+import { ProductWheel } from "@/components/ProductWheel";
+
 const INSURE_OPTIONS = [
-  { label: "Car", href: "/quote/motor" },
-  { label: "Health", href: "/quote/medical" },
-  { label: "Home", href: "/quote/home" },
-  { label: "Business", href: "/quote/business" },
-  { label: "Travel", href: "/quote/travel" },
-  { label: "Life", href: "/quote/life" },
-  { label: "Personal accident", href: "/quote/personal_accident" },
+  { category: "motor", name: "Car", href: "/quote/motor", desc: "Comprehensive or third-party cover for your car." },
+  { category: "medical", name: "Health", href: "/quote/medical", desc: "Individual or family medical cover." },
+  { category: "home", name: "Home", href: "/quote/home", desc: "Cover for your house or apartment." },
+  { category: "business", name: "Business", href: "/quote/business", desc: "Property, liability, or combined business cover." },
+  { category: "travel", name: "Travel", href: "/quote/travel", desc: "Cover for medical emergencies, luggage, and cancellations." },
+  { category: "life", name: "Life", href: "/quote/life", desc: "Term cover that protects your dependents." },
+  { category: "personal_accident", name: "Personal accident", href: "/quote/personal_accident", desc: "A lump-sum payout if an accident affects your ability to work." },
+  { category: "professional_indemnity", name: "Professional indemnity", href: "/quote/professional_indemnity", desc: "Cover against claims of negligence or error in your professional service." },
+  { category: "wiba", name: "WIBA", href: "/quote/wiba", desc: "Statutory cover for your employees against workplace injury." },
 ];
 
 const TRUST_ROW = [
@@ -142,23 +146,12 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.7, delay: 0.15, ease: [0.21, 0.47, 0.32, 0.98] }}
           >
-            <Card className="relative flex flex-col gap-5 shadow-[0_20px_60px_-15px_rgba(232,161,0,0.35)]">
+            <Card className="relative flex flex-col gap-8 overflow-hidden shadow-[0_20px_60px_-15px_rgba(232,161,0,0.35)] bg-[radial-gradient(ellipse_at_center,transparent_38%,#FFF3D6_72%,#FFC53D_100%)]">
               <div>
                 <h2 className="text-xl font-bold">What do you want to insure?</h2>
                 <p className="mt-1 text-sm text-ink-soft">Pick one to start a quote - takes about two minutes.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {INSURE_OPTIONS.map((opt, i) => (
-                  <motion.div key={opt.label} whileHover={{ y: -2 }} transition={{ duration: 0.15 }}>
-                    <Link
-                      href={opt.href}
-                      className="block rounded-control border border-neutral-border px-4 py-3 text-sm font-medium text-ink transition-colors hover:border-brand-deep hover:bg-brand-tint"
-                    >
-                      {opt.label}
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
+              <ProductWheel items={INSURE_OPTIONS} compact />
             </Card>
           </motion.div>
         </div>

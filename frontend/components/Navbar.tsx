@@ -19,6 +19,8 @@ const INSURANCE_LINKS = [
   { label: "Travel", href: "/quote/travel" },
   { label: "Business", href: "/quote/business" },
   { label: "Personal accident", href: "/quote/personal_accident" },
+  { label: "Professional indemnity", href: "/quote/professional_indemnity" },
+  { label: "WIBA", href: "/quote/wiba" },
 ];
 
 const NAV_LINKS = [
@@ -60,7 +62,7 @@ export function Navbar() {
       className={`sticky top-0 z-40 border-b transition-colors ${scrolled ? "border-neutral-border bg-brand-tint/90 backdrop-blur" : "border-transparent bg-brand backdrop-blur-sm"
         }`}
     >
-      <div className="mx-auto flex max-w-8xl items-center justify-between px-2 py-2 md:px-3">
+      <div className="mx-auto flex max-w-8xl items-center justify-between px-2 py-1 md:px-3">
         <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
           {/* Somosure */}
           <Image

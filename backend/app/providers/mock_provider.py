@@ -24,6 +24,8 @@ _BASE_RATES: dict[str, Decimal] = {
     "home": Decimal("12000"),
     "life": Decimal("20000"),
     "business": Decimal("50000"),
+    "professional_indemnity": Decimal("28000"),
+    "wiba": Decimal("15000"),
 }
 
 

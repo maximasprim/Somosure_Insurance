@@ -121,4 +121,36 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
     ],
   },
+  professional_indemnity: {
+    category: "professional_indemnity",
+    title: "Professional indemnity insurance quote",
+    fields: [
+      { name: "profession", label: "Profession", type: "text", required: true, placeholder: "e.g. architect, consultant, lawyer" },
+      { name: "cover_amount", label: "Cover amount (KES)", type: "number", required: true, placeholder: "5000000" },
+      { name: "years_in_practice", label: "Years in practice", type: "number" },
+      { name: "annual_fee_income", label: "Estimated annual fee income (KES)", type: "number" },
+      { name: "prior_claims", label: "Any claims in the last 5 years?", type: "select", options: [
+        { value: "no", label: "No" },
+        { value: "yes", label: "Yes" },
+      ] },
+      { name: "full_name", label: "Your full name", type: "text", required: true },
+      { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+    ],
+  },
+  wiba: {
+    category: "wiba",
+    title: "Work Injury Benefits (WIBA) insurance quote",
+    fields: [
+      { name: "business_type", label: "Nature of business", type: "text", required: true, placeholder: "e.g. construction, manufacturing, office" },
+      { name: "num_employees", label: "Number of employees", type: "number", required: true },
+      { name: "annual_payroll", label: "Estimated annual payroll (KES)", type: "number", required: true },
+      { name: "work_risk_level", label: "Nature of work", type: "select", required: true, options: [
+        { value: "low", label: "Low risk (office-based)" },
+        { value: "medium", label: "Medium risk (retail, light industry)" },
+        { value: "high", label: "High risk (construction, manufacturing)" },
+      ] },
+      { name: "full_name", label: "Your full name", type: "text", required: true },
+      { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+    ],
+  },
 };

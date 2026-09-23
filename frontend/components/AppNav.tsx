@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { LayoutDashboard, FileText, LifeBuoy, User, Menu, X, LogOut, Home } from "lucide-react";
 import { clearSession } from "@/lib/api";
+import SomosureLogo from "@/assets/somosure_logo.png";
+import Image from "next/image";
 
 const LINKS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -33,11 +35,34 @@ export function AppNav() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-neutral-border bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5 md:px-12">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="font-display text-base font-extrabold tracking-tight">
+      <div className="mx-auto flex max-w-8xl items-center justify-between px-6 py-1 md:px-8">
+        <div className="flex items-center gap-16">
+          {/* <Link href="/" className="font-display text-base font-extrabold tracking-tight">
             Somosure
-          </Link>
+          </Link> */}
+              <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
+                  {/* Somosure */}
+                  <div className="relative inline-block">
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{
+                        width: "220%",
+                        height: "220%",
+                        background:
+                          "radial-gradient(circle, rgba(255,204,0,0.95) 0%, rgba(255,204,0,0.55) 30%, rgba(255,204,0,0.20) 55%, transparent 72%)",
+                        filter: "blur(14px)",
+                        zIndex: 0,
+                      }}
+                    />
+                    <Image
+                      src={SomosureLogo}
+                      alt="Somosure"
+                      className="relative z-10 h-8 md:h-12 w-auto"
+                      priority
+                    />
+                  </div>
+                </Link>
           <div className="hidden items-center gap-1 md:flex">
             {LINKS.map((l) => {
               const active = pathname === l.href || (l.href !== "/dashboard" && pathname?.startsWith(l.href));

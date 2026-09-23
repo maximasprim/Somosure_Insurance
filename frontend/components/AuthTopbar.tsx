@@ -10,7 +10,7 @@ import Image from "next/image";
  */
 export function AuthTopbar({ crossLinkHref, crossLinkLabel }: { crossLinkHref: string; crossLinkLabel: string }) {
   return (
-    <div className="flex justify-between px-8 py-2 items-center pt-3">
+    <div className="flex justify-between px-8 py-1 items-center pt-3">
       <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
         {/* Somosure */}
         <div className="relative inline-block">

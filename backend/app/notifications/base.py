@@ -5,11 +5,13 @@ this interface, and the actions.py send_notification function calls it
 after recording the Notification row, so the dispatch attempt itself is
 logged and auditable regardless of whether it succeeds.
 
-No real SMS/email credentials exist in this codebase (spec §51 - never
-fabricate a delivery that didn't happen). MockDispatcher logs what it
-*would* send and returns success; a real dispatcher (e.g. Africa's
-Talking for SMS - a Kenyan provider used widely for exactly this - or
-SendGrid/SES for email) plugs in by implementing this same interface.
+SMS has no real credentials configured by default (spec §51 - never
+fabricate a delivery that didn't happen) - MockDispatcher logs what it
+*would* send and returns success until real Africa's Talking credentials
+are supplied (a Kenyan provider used widely for exactly this). Email has
+a real implementation, SMTPDispatcher, that sends through a normal work
+email account via SMTP - see backend/.env.example for the SMTP_* setup
+notes; it also falls back to MockDispatcher until those are configured.
 """
 
 from abc import ABC, abstractmethod

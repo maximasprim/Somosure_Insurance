@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class QuoteRequestCreate(BaseModel):
-    category: str = Field(examples=["motor", "medical", "travel", "home", "life", "business", "personal_accident"])
+    category: str = Field(examples=["motor", "medical", "travel", "home", "life", "business", "personal_accident", "professional_indemnity", "wiba"])
     answers: dict = Field(default_factory=dict, description="Smart-form answers, shape depends on category")
     customer_id: str | None = None
 

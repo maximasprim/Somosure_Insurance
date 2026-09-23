@@ -32,7 +32,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-7xl px-6 py-12">
         <div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">{error}</div>
       </main>
     );
@@ -40,12 +40,12 @@ export default function DashboardPage() {
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-4xl px-6 py-12 text-ink-soft">Loading your dashboard…</main>
+      <main className="mx-auto max-w-7xl px-6 py-12 text-ink-soft">Loading your dashboard…</main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
+    <main className="mx-auto max-w-7xl px-6 py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">My dashboard</h1>
         <div className="flex gap-3">

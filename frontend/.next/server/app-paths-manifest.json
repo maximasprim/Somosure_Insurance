@@ -1,4 +1,7 @@
 {
-  "/forgot-password/page": "app/forgot-password/page.js",
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/renewals/page": "app/renewals/page.js",
+  "/insurance/page": "app/insurance/page.js",
+  "/page": "app/page.js",
+  "/quote/motor/page": "app/quote/motor/page.js"
 }
