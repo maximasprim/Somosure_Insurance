@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "somosure-documents"
 
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000", "https://somosure-insuarance-ltd.vercel.app"
 
     # Used to build links inside emails/SMS sent to users (password reset,
     # etc.) - the frontend origin, not the API's own.
-    frontend_base_url: str = "http://localhost:3000"
+    frontend_base_url: str = "http://localhost:3000", "https://somosure-insuarance-ltd.vercel.app"
 
     # Real email delivery via a standard SMTP account (a work email
     # inbox, not a dedicated transactional-email service) - see
