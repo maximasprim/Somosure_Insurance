@@ -45,31 +45,31 @@ export function Footer() {
     <footer className="border-t border-neutral-border bg-neutral">
       <div className="mx-auto max-w-8xl px-2 py-2 mt-12 md:px-4">
         <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
-       <div className="relative items-center justify-center sm:col-span-2 md:col-span-1">
-  <div className="relative inline-block">
-    <div
-      aria-hidden
-      className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-      style={{
-        width: "220%",
-        height: "220%",
-        background:
-          "radial-gradient(circle, rgba(255,204,0,0.95) 0%, rgba(255,204,0,0.55) 30%, rgba(255,204,0,0.20) 55%, transparent 72%)",
-        filter: "blur(14px)",
-        zIndex: 0,
-      }}
-    />
-    <Image
-      src={SomosureLogo}
-      alt="Somosure"
-      className="relative z-10 h-8 md:h-12 w-auto"
-      priority
-    />
-  </div>
-  <p className="mt-3 max-w-[26ch] text-sm text-ink-soft">
-    Insurance Made Simpler - compare, buy, and manage cover from one trusted platform.
-  </p>
-</div>
+          <div className="relative items-center justify-center sm:col-span-2 md:col-span-1">
+            <div className="relative inline-block">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+                style={{
+                  width: "220%",
+                  height: "220%",
+                  background:
+                    "radial-gradient(circle, rgba(255,204,0,0.95) 0%, rgba(255,204,0,0.55) 30%, rgba(255,204,0,0.20) 55%, transparent 72%)",
+                  filter: "blur(14px)",
+                  zIndex: 0,
+                }}
+              />
+              <Image
+                src={SomosureLogo}
+                alt="Somosure"
+                className="relative z-10 h-8 md:h-12 w-auto"
+                priority
+              />
+            </div>
+            <p className="mt-3 max-w-[26ch] text-sm text-ink-soft">
+              Insurance Made Simpler - compare, buy, and manage cover from one trusted platform.
+            </p>
+          </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>

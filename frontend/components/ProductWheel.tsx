@@ -166,7 +166,7 @@ export function ProductWheel({ items, compact = false }: { items: WheelItem[]; c
                         <h3 className={compact ? "font-display text-sm font-bold" : "font-display text-lg font-bold"}>{activeItem.name}</h3>
                         {!compact && <p className="max-w-sm text-sm text-ink-soft">{activeItem.desc}</p>}
                         <Link href={activeItem.href} className="mt-1">
-                            <Button size="md">Get a quote</Button>
+                            <Button className="w-full rounded-full">Get a quote</Button>
                         </Link>
                     </motion.div>
                 </AnimatePresence>
