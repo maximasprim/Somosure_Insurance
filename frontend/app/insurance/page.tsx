@@ -23,11 +23,11 @@ export default function InsurancePage() {
   return (
     <main>
       <Navbar />
-      <section className="mx-auto max-w-4xl px-6 py-16 md:px-12">
-        <Reveal>
+      <section className="mx-auto max-w-7xl px-6 py-16 md:px-12">
+        <Reveal className="flex flex-col items-center">
           <h1 className="text-3xl font-extrabold md:text-4xl">Insurance, by what you're protecting</h1>
-          <p className="mt-3 max-w-prose text-ink-soft">
-            Every product below compares quotes from multiple insurers, so you're not stuck taking whatever one company offers.
+          <p className="mt-3 max-w-prose text-ink-soft tight tracking-wide text-center text-xs md:text-sm">
+            Every product below compares quotes from multiple insurers, so you're <br></br> not stuck taking whatever one company offers.
           </p>
         </Reveal>
 
@@ -37,7 +37,7 @@ export default function InsurancePage() {
           </div>
         </Reveal>
 
-        <div className="mt-16 grid gap-4 sm:grid-cols-2">
+        <div className="mt-16 grid gap-4 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-4">
           {PRODUCTS.map((p, i) => (
             <Reveal key={p.href} delay={i * 0.05}>
               <Card className="flex h-full flex-col gap-3">

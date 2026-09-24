@@ -43,7 +43,7 @@ const COLUMNS = [
 export function Footer() {
   return (
     <footer className="border-t border-neutral-border bg-neutral">
-      <div className="mx-auto max-w-8xl px-2 py-14 md:px-4">
+      <div className="mx-auto max-w-8xl px-2 py-2 mt-12 md:px-4">
         <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
        <div className="relative items-center justify-center sm:col-span-2 md:col-span-1">
   <div className="relative inline-block">

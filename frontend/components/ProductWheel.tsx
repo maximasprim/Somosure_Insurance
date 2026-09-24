@@ -96,7 +96,7 @@ export function ProductWheel({ items, compact = false }: { items: WheelItem[]; c
             onBlur={() => setPaused(false)}
             onKeyDown={onKeyDown}
         >
-            <div className={`relative mx-auto select-none ${compact ? "h-32 sm:h-36" : "h-44 sm:h-56 md:h-64"}`} aria-hidden={false}>
+            <div className={`relative mx-auto select-none overflow-x-clip ${compact ? "h-32 sm:h-36" : "h-44 sm:h-56 md:h-64"}`} aria-hidden={false}>
                 {items.map((item, i) => {
                     let raw = i - active;
                     if (raw > total / 2) raw -= total;
