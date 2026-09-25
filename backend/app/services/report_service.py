@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.claim import Claim
 from app.models.crm import Lead
 from app.models.customer import Customer
 from app.models.payment import Payment
@@ -44,6 +45,13 @@ async def get_overview(db: AsyncSession) -> dict:
 
     sticker_rows = (await db.execute(select(Sticker.status, func.count(Sticker.id)).group_by(Sticker.status))).all()
 
+    claim_rows = (await db.execute(select(Claim.status, func.count(Claim.id)).group_by(Claim.status))).all()
+    claims_by_status = {status: count for status, count in claim_rows}
+    total_claims = sum(claims_by_status.values())
+    open_claims = total_claims - sum(
+        claims_by_status.get(s, 0) for s in ("settled", "closed", "rejected")
+    )
+
     # Quote-to-policy conversion: policies issued ÷ quote requests that
     # actually received quotes back. A crude but honest proxy - the
     # platform doesn't yet track which specific quote became which policy
@@ -59,7 +67,7 @@ async def get_overview(db: AsyncSession) -> dict:
         "revenue": {"collected": successful_revenue, "commission": total_commission, "outstanding_payment_count": outstanding_payments},
         "renewals": {"due": renewals_due, "renewed": renewals_renewed},
         "stickers_by_status": {status: count for status, count in sticker_rows},
-        "claims": "not tracked yet - claims management is a future module, not part of the ten build phases",
+        "claims": {"total": total_claims, "open": open_claims, "by_status": claims_by_status},
     }
 
 

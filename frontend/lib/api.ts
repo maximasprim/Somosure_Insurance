@@ -68,3 +68,15 @@ export function getTokenRole(): string | null {
     return null;
   }
 }
+
+export function getTokenUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = window.localStorage.getItem("somosure_access_token");
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
+}

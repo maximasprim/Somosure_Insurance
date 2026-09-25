@@ -46,6 +46,11 @@ export default function ReportsOverviewPage() {
     count,
   }));
 
+  const claimsChartData = Object.entries(data.claims.by_status).map(([status, count]) => ({
+    status: status.replace(/_/g, " "),
+    count,
+  }));
+
   const providerChartData = providers.map((p) => ({
     name: p.name.length > 18 ? p.name.slice(0, 16) + "…" : p.name,
     quotes: p.quotes_returned,
@@ -74,9 +79,9 @@ export default function ReportsOverviewPage() {
         <KpiCard label="Revenue collected" value={formatKES(data.revenue.collected)} />
         <KpiCard label="Commission" value={formatKES(data.revenue.commission)} />
         <KpiCard label="Outstanding payments" value={data.revenue.outstanding_payment_count} />
+        <KpiCard label="Open claims" value={data.claims.open} sub={`${data.claims.total} total`} />
+        <KpiCard label="Renewals due" value={data.renewals.due} sub={`${data.renewals.renewed} renewed`} />
       </div>
-
-      <p className="mt-4 text-xs text-ink-soft">{data.claims}</p>
 
       {providerChartData.length > 0 && (
         <section className="mt-10">
@@ -90,6 +95,23 @@ export default function ReportsOverviewPage() {
                 <Tooltip />
                 <Bar dataKey="quotes" fill="#FFC53D" name="Quotes returned" />
                 <Bar dataKey="policies" fill="#1A1D21" name="Policies issued" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </section>
+      )}
+
+      {claimsChartData.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">Claims by status</h2>
+          <Card className="mt-3 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={claimsChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#E3E5E9" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="status" width={120} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="count" fill="#1A1D21" />
               </BarChart>
             </ResponsiveContainer>
           </Card>

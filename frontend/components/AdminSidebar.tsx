@@ -21,6 +21,14 @@ import {
   X,
   LogOut,
   Home,
+  UserCog,
+  Handshake,
+  ListTodo,
+  FileCheck2,
+  CreditCard,
+  RefreshCw,
+  LifeBuoy,
+  BookOpen,
 } from "lucide-react";
 import { clearSession, getTokenRole } from "@/lib/api";
 import Image from "next/image";
@@ -43,15 +51,26 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Leads", href: "/admin/leads", icon: Users },
       { label: "Applications", href: "/admin/applications", icon: FileText },
+      { label: "Partners", href: "/admin/partners", icon: Handshake },
+      { label: "Tasks", href: "/admin/tasks", icon: ListTodo },
     ],
   },
   {
     title: "Underwriting",
     items: [
+      { label: "Policies", href: "/admin/policies", icon: FileCheck2 },
       { label: "Claims", href: "/admin/claims", icon: ShieldAlert },
       { label: "Financing", href: "/admin/financing", icon: Banknote },
       { label: "Providers", href: "/admin/providers", icon: Building2 },
       { label: "Rate cards", href: "/admin/rate-cards", icon: Percent },
+    ],
+  },
+  {
+    title: "Records",
+    items: [
+      { label: "Payments", href: "/admin/payments", icon: CreditCard },
+      { label: "Renewals", href: "/admin/renewals", icon: RefreshCw },
+      { label: "Support tickets", href: "/admin/support", icon: LifeBuoy },
     ],
   },
   {
@@ -60,6 +79,7 @@ const SECTIONS: NavSection[] = [
       { label: "Automation", href: "/admin/automation", icon: Zap },
       { label: "Stickers", href: "/admin/stickers", icon: Tag },
       { label: "WhatsApp", href: "/admin/whatsapp", icon: MessageCircle },
+      { label: "Content & FAQs", href: "/admin/content", icon: BookOpen },
     ],
   },
   {
@@ -68,6 +88,10 @@ const SECTIONS: NavSection[] = [
       { label: "Reports", href: "/admin/reports", icon: BarChart3 },
       { label: "Search", href: "/admin/search", icon: Search },
     ],
+  },
+  {
+    title: "Administration",
+    items: [{ label: "Staff & access", href: "/admin/users", icon: UserCog }],
   },
 ];
 

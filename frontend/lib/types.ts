@@ -193,7 +193,7 @@ export interface ReportOverview {
   revenue: { collected: string; commission: string; outstanding_payment_count: number };
   renewals: { due: number; renewed: number };
   stickers_by_status: Record<string, number>;
-  claims: string;
+  claims: { total: number; open: number; by_status: Record<string, number> };
 }
 
 export interface ProviderPerformance {

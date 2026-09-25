@@ -34,7 +34,9 @@ class FaqOut(BaseModel):
     id: uuid.UUID
     question: str
     answer: str
+    category_id: uuid.UUID | None
     display_order: int
+    is_published: bool
 
     model_config = {"from_attributes": True}
 
@@ -44,6 +46,15 @@ class FaqCreate(BaseModel):
     answer: str
     category_id: str | None = None
     display_order: int = 0
+    is_published: bool = True
+
+
+class FaqUpdate(BaseModel):
+    question: str | None = None
+    answer: str | None = None
+    category_id: str | None = None
+    display_order: int | None = None
+    is_published: bool | None = None
 
 
 class ContentCategoryOut(BaseModel):

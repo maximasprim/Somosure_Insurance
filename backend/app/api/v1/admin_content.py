@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_claims, require_roles
 from app.models.content import Content, Faq
-from app.schemas.content import ContentCreate, ContentOut, ContentUpdate, FaqCreate, FaqOut
+from app.schemas.content import ContentCreate, ContentOut, ContentUpdate, FaqCreate, FaqOut, FaqUpdate
 
 router = APIRouter(
     prefix="/api/v1/admin/content",
@@ -46,6 +46,23 @@ async def update_content(content_id: str, payload: ContentUpdate, db: AsyncSessi
     return content
 
 
+@router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_content(content_id: str, db: AsyncSession = Depends(get_db)):
+    content = await db.get(Content, content_id)
+    if not content:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
+    await db.delete(content)
+    await db.commit()
+
+
+@router.get("/faqs", response_model=list[FaqOut])
+async def list_all_faqs(db: AsyncSession = Depends(get_db)):
+    """Every FAQ, published or not - unlike the public /api/v1/faqs list,
+    which only returns published ones. This is what the editor needs to
+    see so a draft doesn't just vanish from view once created."""
+    return (await db.scalars(select(Faq).order_by(Faq.display_order))).all()
+
+
 @router.post("/faqs", response_model=FaqOut)
 async def create_faq(payload: FaqCreate, db: AsyncSession = Depends(get_db)):
     faq = Faq(id=uuid.uuid4(), **payload.model_dump())
@@ -53,3 +70,25 @@ async def create_faq(payload: FaqCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(faq)
     return faq
+
+
+@router.patch("/faqs/{faq_id}", response_model=FaqOut)
+async def update_faq(faq_id: uuid.UUID, payload: FaqUpdate, db: AsyncSession = Depends(get_db)):
+    faq = await db.get(Faq, faq_id)
+    if not faq:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "FAQ not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(faq, field, value)
+    await db.commit()
+    await db.refresh(faq)
+    return faq
+
+
+@router.delete("/faqs/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_faq(faq_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    faq = await db.get(Faq, faq_id)
+    if not faq:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "FAQ not found")
+    await db.delete(faq)
+    await db.commit()
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -71,15 +72,24 @@ export default function AdminSearchPage() {
               <div key={key} className="mb-6">
                 <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-soft">{label}</h2>
                 <div className="flex flex-col gap-2">
-                  {items.map((item: any) => (
-                    <Card key={item.id} className="flex items-center justify-between">
-                      <span className="font-mono text-sm">
-                        {item.reference ?? item.policy_number ?? item.full_name}
-                        {item.phone && <span className="ml-2 font-sans text-ink-soft">{item.phone}</span>}
-                      </span>
-                      {item.status && <Badge tone="brand">{item.status.replace(/_/g, " ")}</Badge>}
-                    </Card>
-                  ))}
+                  {items.map((item: any) => {
+                    const card = (
+                      <Card key={item.id} className="flex items-center justify-between">
+                        <span className="font-mono text-sm">
+                          {item.reference ?? item.policy_number ?? item.full_name}
+                          {item.phone && <span className="ml-2 font-sans text-ink-soft">{item.phone}</span>}
+                        </span>
+                        {item.status && <Badge tone="brand">{item.status.replace(/_/g, " ")}</Badge>}
+                      </Card>
+                    );
+                    return key === "customers" ? (
+                      <Link key={item.id} href={`/admin/customers/${item.id}`}>
+                        {card}
+                      </Link>
+                    ) : (
+                      card
+                    );
+                  })}
                 </div>
               </div>
             );
