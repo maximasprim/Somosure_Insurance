@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { api, isLoggedIn } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Claim, CustomerProfile, DashboardData } from "@/lib/types";
 
 const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
@@ -111,10 +111,6 @@ export default function ClaimsPage() {
   }
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      window.location.href = "/login";
-      return;
-    }
     load().catch((e) => setError(e instanceof Error ? e.message : "Could not load your claims"));
   }, []);
 

@@ -57,26 +57,44 @@ export function isLoggedIn(): boolean {
 // to /admin, customers to /dashboard"). This is NOT a security check - the
 // backend re-verifies the signature and role on every request via
 // require_roles(); nothing here is trusted for authorization.
-export function getTokenRole(): string | null {
+function getTokenPayload(): Record<string, unknown> | null {
   if (typeof window === "undefined") return null;
   const token = window.localStorage.getItem("somosure_access_token");
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.role ?? null;
+    return JSON.parse(atob(token.split(".")[1]));
   } catch {
     return null;
   }
 }
 
+export function getTokenRole(): string | null {
+  const payload = getTokenPayload();
+  return (payload?.role as string) ?? null;
+}
+
 export function getTokenUserId(): string | null {
-  if (typeof window === "undefined") return null;
-  const token = window.localStorage.getItem("somosure_access_token");
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub ?? null;
-  } catch {
-    return null;
-  }
+  const payload = getTokenPayload();
+  return (payload?.sub as string) ?? null;
+}
+
+// True once the token's own "exp" claim (seconds since epoch) is in the
+// past. This is a client-side convenience check only, so pages that make
+// no API call on load (e.g. a static admin landing page) can still notice
+// an expired token instead of rendering as if the session were live - the
+// backend is still the real authority and re-verifies on every request.
+export function isTokenExpired(): boolean {
+  const payload = getTokenPayload();
+  const exp = payload?.exp as number | undefined;
+  if (!exp) return false;
+  return Date.now() >= exp * 1000;
+}
+
+// The single source of truth for "is this a usable session right now" -
+// used by AuthGuard to decide whether to render a protected route or bounce
+// to /login. Combines presence + expiry so callers don't have to.
+export function hasValidSession(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!window.localStorage.getItem("somosure_access_token")) return false;
+  return !isTokenExpired();
 }

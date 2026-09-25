@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { api, isLoggedIn } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { CustomerProfile } from "@/lib/types";
 
 export default function ProfilePage() {
@@ -13,10 +13,6 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      window.location.href = "/login";
-      return;
-    }
     api.get<CustomerProfile>("/api/v1/me").then(setProfile).catch((e) => setError(e.message));
   }, []);
 

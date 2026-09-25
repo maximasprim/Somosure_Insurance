@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { api, isLoggedIn } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { SupportTicket } from "@/lib/types";
 
 const CATEGORIES = ["quote", "payment", "policy", "claim", "renewal", "technical", "general"];
@@ -22,10 +22,6 @@ export default function SupportPage() {
   }
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      window.location.href = "/login";
-      return;
-    }
     load();
   }, []);
 

@@ -65,7 +65,7 @@ export default function AdminSupportPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">Support tickets</h1>
       <p className="mt-1 text-ink-soft">Everything customers have submitted through the help center.</p>
 

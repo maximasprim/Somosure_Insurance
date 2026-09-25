@@ -58,7 +58,7 @@ export default function AdminRenewalsPage() {
   const today = new Date();
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-6 py-12">
       <h1 className="text-2xl font-bold">Renewals</h1>
       <p className="mt-1 text-ink-soft">
         Every policy renewal being tracked. The automation page can trigger the reminder scan; this is where you see
