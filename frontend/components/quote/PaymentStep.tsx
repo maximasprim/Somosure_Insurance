@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { FinancingOption } from "@/components/quote/FinancingOption";
+import { FinancingDocumentsStep } from "@/components/quote/FinancingDocumentsStep";
 import { api } from "@/lib/api";
 import type { FinancingApplicationResult, PaymentInitiateResult, PaymentStatusResult } from "@/lib/types";
 
@@ -29,10 +30,13 @@ export function PaymentStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const financingApproved = financing?.status === "approved";
+
   // Once financing is approved, only the deposit is collected via M-Pesa now
   // - the remainder is a separate Bidii Credit installment schedule, never
-  // altering the insurance premium itself (spec §14).
-  const amountDue = financing ? financing.deposit_amount : amount;
+  // altering the insurance premium itself (spec §14). If Bidii Credit
+  // rejected it, the full premium is still due here as normal.
+  const amountDue = financingApproved && financing ? financing.deposit_amount : amount;
 
   async function handleInitiate() {
     setBusy(true);
@@ -81,11 +85,11 @@ export function PaymentStep({
       <div>
         <h2 className="text-xl font-bold">Pay for your policy</h2>
         <p className="mt-1 text-sm text-ink-soft">
-          {financing ? (
+          {financingApproved && financing ? (
             <>
               Deposit due now: <span className="font-semibold text-ink">KES {Number(amountDue).toLocaleString()}</span>
               {" "}- remaining KES {Number(financing.financed_amount).toLocaleString()} financed over{" "}
-              {financing.term_months} months with Bidii Credit.
+              {financing.term_months} months with Bidii Credit at {financing.interest_rate_monthly}%/month.
             </>
           ) : (
             <>Amount due: <span className="font-semibold text-ink">KES {Number(amount).toLocaleString()}</span></>
@@ -97,8 +101,18 @@ export function PaymentStep({
         <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} />
       )}
 
-      {financing && (
-        <Badge tone="success">Financing approved - {financing.reference}</Badge>
+      {financing && financingApproved && (
+        <>
+          <Badge tone="success">Financing approved - {financing.reference}</Badge>
+          <FinancingDocumentsStep financingApplicationId={financing.id} isCorporate={financing.is_corporate} />
+        </>
+      )}
+
+      {financing && !financingApproved && (
+        <div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">
+          Bidii Credit couldn't approve financing for this application{financing.rejection_reason ? `: ${financing.rejection_reason}` : "."}{" "}
+          You can still pay the full premium below.
+        </div>
       )}
 
       {!payment && (

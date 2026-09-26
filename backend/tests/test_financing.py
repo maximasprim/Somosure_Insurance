@@ -35,7 +35,15 @@ async def test_eligibility_matches_spec_worked_example(client, db_session, seede
     assert body["eligible"] is True
     assert Decimal(body["deposit_amount"]) == Decimal("6000.00")
     assert Decimal(body["financed_amount"]) == Decimal("24000.00")
-    assert Decimal(body["monthly_installment"]) == Decimal("4000.00")
+    assert Decimal(body["interest_rate_monthly"]) == Decimal("3.50")
+    # 24,000 financed: 5,040 interest (3.5% x 6mo) + 240 loan application
+    # fee (1%) + 240 life insurance fee (1%) + 0 excise duty (defaults to
+    # 0% until a confirmed rate is set) = 29,520 total repayable -> 4,920/mo.
+    assert Decimal(body["loan_application_fee"]) == Decimal("240.00")
+    assert Decimal(body["life_insurance_fee"]) == Decimal("240.00")
+    assert Decimal(body["excise_duty_amount"]) == Decimal("0.00")
+    assert Decimal(body["total_repayable"]) == Decimal("29520.00")
+    assert Decimal(body["monthly_installment"]) == Decimal("4920.00")
 
 
 async def test_financing_application_creates_agreement_and_installment_schedule(client, db_session, seeded_providers):
@@ -71,10 +79,11 @@ async def test_financing_application_creates_agreement_and_installment_schedule(
     assert agreement["term_months"] == 4
     assert len(agreement["installments"]) == 4
 
-    # The schedule should sum exactly to the financed amount (spec §14) -
-    # the last installment absorbs any rounding remainder.
+    # The schedule should sum exactly to the total repayable amount
+    # (principal + interest) - the last installment absorbs any rounding
+    # remainder.
     total_scheduled = sum(Decimal(i["amount"]) for i in agreement["installments"])
-    assert total_scheduled == Decimal(application["financed_amount"])
+    assert total_scheduled == Decimal(application["total_repayable"])
 
     for i, installment in enumerate(agreement["installments"], start=1):
         assert installment["installment_number"] == i

@@ -19,6 +19,7 @@ import PioneerLogo from "@/assets/pioneerlogo1.png";
 import JubileeLogo from "@/assets/jubilee-group-logo.png";
 import ApaLogo from "@/assets/Apa_logo.png";
 import AmarcoLogo from "@/assets/Amarco_logo.png";
+// import BidiiLogo from "@/assets/Bidii-logo.png";
 
 import { ProductWheel } from "@/components/ProductWheel";
 
@@ -91,6 +92,7 @@ const TESTIMONIALS = [
 // without an actual signed partnership.
 const MARKETPLACE_PARTNERS = [
   { name: "Britam Insurance", logo: BritamLogo },
+  // { name: "Bidii Credit", logo: BidiiLogo },
   { name: "Monarch Insurance", logo: MonarchLogo },
   { name: "CIC Insurance", logo: CicLogo },
   { name: "Pioneer Insurance", logo: PioneerLogo },

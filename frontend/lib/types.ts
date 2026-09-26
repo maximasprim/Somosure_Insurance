@@ -43,7 +43,7 @@ export interface ApplicationEvent {
   notes: string | null;
   created_at: string;
 }
- 
+
 export interface ApplicationDocument {
   id: string;
   document_type: string;
@@ -51,7 +51,7 @@ export interface ApplicationDocument {
   status: string;
   uploaded_at: string;
 }
- 
+
 export interface ApplicationCustomer {
   id: string;
   full_name: string;
@@ -60,7 +60,7 @@ export interface ApplicationCustomer {
   id_number: string | null;
   kra_pin: string | null;
 }
- 
+
 export interface ApplicationVehicle {
   id: string;
   registration_number: string;
@@ -72,7 +72,7 @@ export interface ApplicationVehicle {
   value: string;
   usage: string;
 }
- 
+
 export interface ApplicationInsuredAsset {
   id: string;
   category: string;
@@ -80,7 +80,7 @@ export interface ApplicationInsuredAsset {
   value: string | null;
   details: Record<string, unknown>;
 }
- 
+
 export interface ApplicationQuote {
   id: string;
   provider_name: string;
@@ -96,7 +96,7 @@ export interface ApplicationQuote {
   deductibles: Record<string, unknown>;
   is_mock: boolean;
 }
- 
+
 export interface ApplicationDetail {
   id: string;
   reference: string;
@@ -245,6 +245,12 @@ export interface EligibilityResult {
   deposit_percentage: string;
   deposit_amount: string;
   financed_amount: string;
+  interest_rate_monthly: string;
+  concession_applied: boolean;
+  loan_application_fee: string | null;
+  life_insurance_fee: string | null;
+  excise_duty_amount: string | null;
+  total_repayable: string | null;
   term_months: number;
   monthly_installment: string | null;
   is_mock: boolean;
@@ -255,12 +261,123 @@ export interface FinancingApplicationResult {
   reference: string;
   status: string;
   total_premium: string;
+  deposit_percentage: string;
   deposit_amount: string;
   financed_amount: string;
+  interest_rate_monthly: string;
+  concession_applied: boolean;
+  loan_application_fee: string;
+  life_insurance_fee: string;
+  excise_duty_amount: string;
+  total_repayable: string;
   term_months: number;
+  has_existing_logbook_loan: boolean;
+  logbook_loan_age_months: number | null;
+  is_corporate: boolean;
   provider_reference: string | null;
   rejection_reason: string | null;
   created_at: string;
+}
+
+export interface FinancingDocument {
+  id: string;
+  document_type: string;
+  original_filename: string;
+  status: string;
+  uploaded_at: string;
+}
+
+export interface FinancingEvent {
+  id: string;
+  event_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface FinancingInstallmentResult {
+  id: string;
+  installment_number: number;
+  due_date: string;
+  amount: string;
+  status: string;
+  paid_at: string | null;
+}
+
+export interface FinancingAgreementResult {
+  id: string;
+  application_id: string;
+  financed_amount: string;
+  interest_rate_monthly: string;
+  total_repayable: string;
+  term_months: number;
+  monthly_installment: string;
+  status: string;
+  installments: FinancingInstallmentResult[];
+}
+
+export interface FinancingCustomer {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string;
+  id_number: string | null;
+  kra_pin: string | null;
+}
+
+export interface FinancingQuote {
+  id: string;
+  provider_name: string;
+  product_name: string | null;
+  premium: string;
+  total: string;
+  currency: string;
+}
+
+export interface FinancingApplicationDetail {
+  id: string;
+  reference: string;
+  status: string;
+  customer: FinancingCustomer;
+  quote: FinancingQuote;
+  total_premium: string;
+  deposit_percentage: string;
+  deposit_amount: string;
+  financed_amount: string;
+  interest_rate_monthly: string;
+  concession_applied: boolean;
+  loan_application_fee_pct: string;
+  loan_application_fee: string;
+  life_insurance_fee_pct: string;
+  life_insurance_fee: string;
+  excise_duty_pct: string;
+  excise_duty_amount: string;
+  total_repayable: string;
+  term_months: number;
+  has_existing_logbook_loan: boolean;
+  logbook_loan_age_months: number | null;
+  is_corporate: boolean;
+  provider_reference: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  documents: FinancingDocument[];
+  events: FinancingEvent[];
+  agreement: FinancingAgreementResult | null;
+}
+
+export interface FinancingSettings {
+  deposit_percentage_standard: string;
+  interest_rate_standard_monthly: string;
+  interest_rate_preferred_monthly: string;
+  min_term_months: number;
+  max_term_months: number;
+  loan_application_fee_pct: string;
+  life_insurance_fee_pct: string;
+  excise_duty_pct: string;
+  concession_loan_age_max_months: number;
+  updated_at: string;
 }
 
 export interface ReportOverview {
