@@ -59,3 +59,21 @@ class ApplicationDocument(Base):
     # uploaded | verified | rejected
 
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ApplicationEvent(Base):
+    """Append-only status/decision history for an application - mirrors
+    ClaimEvent so underwriting decisions (approve/reject) and any notes
+    left with them have the same permanent audit trail claims already do."""
+ 
+    __tablename__ = "application_events"
+ 
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("applications.id"))
+    event_type: Mapped[str] = mapped_column(String(30))  # status_changed, document_uploaded, ...
+    from_status: Mapped[str | None] = mapped_column(String(30))
+    to_status: Mapped[str | None] = mapped_column(String(30))
+    notes: Mapped[str | None] = mapped_column(String(2000))
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+ 

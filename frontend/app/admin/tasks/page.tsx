@@ -91,7 +91,7 @@ export default function AdminTasksPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Tasks</h1>
       <p className="mt-1 text-ink-soft">Follow-ups and to-dos for the team - optionally tied to a lead.</p>
 

@@ -95,7 +95,7 @@ export default function MotorQuotePage() {
   }[step];
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12 md:py-16">
+    <main className="mx-auto max-w-7xl px-6 py-12 md:py-16">
       <h1 className="text-2xl font-bold md:text-3xl">Motor insurance quote</h1>
       <p className="mt-1 text-ink-soft">Reference {result?.reference ?? "will appear once you submit"}</p>
 

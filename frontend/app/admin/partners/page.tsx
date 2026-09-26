@@ -75,7 +75,7 @@ export default function AdminPartnersPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Partners</h1>
       <p className="mt-1 text-ink-soft">Car dealers, vehicle importers, employers, SACCOs, banks, and agents that refer business.</p>
 

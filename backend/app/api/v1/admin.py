@@ -5,12 +5,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.security import  get_current_claims, require_roles
 from app.models.application import Application
 from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.schemas.admin import ProductCreate, ProductOut, ProviderCreate, ProviderOut, ProviderUpdate
-from app.schemas.application import ApplicationOut
-from app.services.application_service import approve_application
+from app.schemas.application import ApplicationDetailOut, ApplicationOut, ApplicationTransitionRequest
+from app.services.application_service import (
+    approve_application,
+    get_application_detail,
+    get_application_document_url,
+    transition_application,
+)
 
 router = APIRouter(
     prefix="/api/v1/admin",
@@ -72,3 +77,32 @@ async def list_applications(db: AsyncSession = Depends(get_db), status_filter: s
 @router.post("/applications/{application_id}/approve", response_model=ApplicationOut)
 async def approve(application_id: str, db: AsyncSession = Depends(get_db)):
     return await approve_application(db, application_id)
+
+
+@router.get("/applications/{application_id}", response_model=ApplicationDetailOut)
+async def get_application(application_id: str, db: AsyncSession = Depends(get_db)):
+    """Full detail view - applicant details, customer, quote/coverage,
+    vehicle/asset, documents, and decision history - so an underwriter has
+    everything needed to decide the application in one place."""
+    return await get_application_detail(db, application_id)
+ 
+ 
+@router.post("/applications/{application_id}/transition", response_model=ApplicationOut)
+async def transition(
+    application_id: str,
+    payload: ApplicationTransitionRequest,
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(get_current_claims),
+):
+    """Decide a submitted application: move it to 'approved' (next stage)
+    or 'rejected' (declined), with an optional note recorded against it.
+    Does not replace the existing /approve route above."""
+    return await transition_application(db, application_id, payload.to_status, claims.get("sub"), payload.notes)
+ 
+ 
+@router.get("/applications/{application_id}/documents/{document_id}/url")
+async def get_application_document_link(application_id: str, document_id: str, db: AsyncSession = Depends(get_db)):
+    """A short-lived signed URL so staff can open an uploaded document."""
+    url = await get_application_document_url(db, application_id, document_id)
+    return {"url": url}
+ 

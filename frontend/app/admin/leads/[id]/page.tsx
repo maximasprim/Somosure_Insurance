@@ -42,7 +42,7 @@ export default function LeadDetailPage({ params }: { params: { id: string } }) {
   if (!lead) return <main className="mx-auto max-w-2xl px-6 py-12 text-ink-soft">Loading…</main>;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">{lead.customer_name}</h1>
         <Badge tone="brand">{lead.stage}</Badge>

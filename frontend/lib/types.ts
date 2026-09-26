@@ -35,6 +35,84 @@ export interface ApplicationResult {
   created_at: string;
 }
 
+export interface ApplicationEvent {
+  id: string;
+  event_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  notes: string | null;
+  created_at: string;
+}
+ 
+export interface ApplicationDocument {
+  id: string;
+  document_type: string;
+  original_filename: string;
+  status: string;
+  uploaded_at: string;
+}
+ 
+export interface ApplicationCustomer {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string;
+  id_number: string | null;
+  kra_pin: string | null;
+}
+ 
+export interface ApplicationVehicle {
+  id: string;
+  registration_number: string;
+  chassis_number: string | null;
+  engine_number: string | null;
+  make: string;
+  model: string;
+  year: number;
+  value: string;
+  usage: string;
+}
+ 
+export interface ApplicationInsuredAsset {
+  id: string;
+  category: string;
+  description: string | null;
+  value: string | null;
+  details: Record<string, unknown>;
+}
+ 
+export interface ApplicationQuote {
+  id: string;
+  provider_name: string;
+  underlying_provider_name: string | null;
+  product_name: string | null;
+  premium: string;
+  taxes: string;
+  fees: string;
+  total: string;
+  currency: string;
+  coverage: Record<string, unknown>;
+  exclusions: Record<string, unknown>;
+  deductibles: Record<string, unknown>;
+  is_mock: boolean;
+}
+ 
+export interface ApplicationDetail {
+  id: string;
+  reference: string;
+  status: string;
+  applicant_details: Record<string, unknown>;
+  provider_reference: string | null;
+  created_at: string;
+  updated_at: string;
+  customer: ApplicationCustomer;
+  quote: ApplicationQuote;
+  vehicle: ApplicationVehicle | null;
+  insured_asset: ApplicationInsuredAsset | null;
+  documents: ApplicationDocument[];
+  events: ApplicationEvent[];
+}
+
 export interface PaymentInitiateResult {
   payment_id: string;
   reference: string;

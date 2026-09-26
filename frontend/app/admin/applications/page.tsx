@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -43,7 +44,7 @@ export default function AdminApplicationsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Applications</h1>
       <p className="mt-1 text-ink-soft">Review submitted applications and approve them for payment and issuance.</p>
 
@@ -61,9 +62,14 @@ export default function AdminApplicationsPage() {
                 </div>
                 <p className="mt-1 text-xs text-ink-soft">Created {new Date(app.created_at).toLocaleString()}</p>
               </div>
-              {app.status === "submitted" && (
-                <Button onClick={() => handleApprove(app.id)}>Approve</Button>
-              )}
+              <div className="flex items-center gap-2">
+                <Link href={`/admin/applications/${app.id}`}>
+                  <Button variant="ghost">View details</Button>
+                </Link>
+                {app.status === "submitted" && (
+                  <Button onClick={() => handleApprove(app.id)}>Quick approve</Button>
+                )}
+              </div>
             </Card>
           ))}
         {!loading && applications.length === 0 && !error && (

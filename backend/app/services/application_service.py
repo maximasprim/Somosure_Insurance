@@ -8,9 +8,27 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storage
-from app.models.application import Application, ApplicationDocument
-from app.models.provider import InsuranceProvider
+from app.models.application import Application, ApplicationDocument, ApplicationEvent
+from app.models.asset import InsuredAsset, Vehicle
+from app.models.customer import Customer
+from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.models.quote import Quote
+from app.schemas.application import (
+    ApplicationCustomerOut,
+    ApplicationDetailOut,
+    ApplicationInsuredAssetOut,
+    ApplicationQuoteOut,
+    ApplicationVehicleOut,
+)
+
+# Only forward transitions a staff member can make directly, mirroring
+# ALLOWED_STAFF_TRANSITIONS in claim_service.py. Kept to exactly what
+# approve_application already enforced (submitted -> approved) plus the
+# sibling "decline" path, since nothing in this codebase today puts an
+# application into "under_review" or "payment_pending" for staff to act on.
+ALLOWED_STAFF_TRANSITIONS: dict[str, set[str]] = {
+    "submitted": {"approved", "rejected"},
+}
 
 
 def generate_application_reference() -> str:
@@ -122,3 +140,123 @@ async def approve_application(db: AsyncSession, application_id: str) -> Applicat
     await db.commit()
     await db.refresh(application)
     return application
+
+
+async def transition_application(
+    db: AsyncSession, application_id: str, to_status: str, actor_user_id: str | None, notes: str | None
+) -> Application:
+    """The general decision endpoint behind the admin review screen: move a
+    submitted application to "approved" (next stage) or "rejected"
+    (declined), with an optional note, recorded permanently on
+    ApplicationEvent. Same shape as claim_service.transition_claim.
+
+    This does not replace approve_application above - that function (and
+    the /approve route + tests that call it) is left exactly as it was.
+    """
+    application = await db.get(Application, application_id)
+    if not application:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+    allowed = ALLOWED_STAFF_TRANSITIONS.get(application.status, set())
+    if to_status not in allowed:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Cannot move application from '{application.status}' to '{to_status}' - allowed next steps: {sorted(allowed) or 'none'}",
+        )
+
+    db.add(
+        ApplicationEvent(
+            application_id=application.id,
+            event_type="status_changed",
+            from_status=application.status,
+            to_status=to_status,
+            actor_user_id=actor_user_id,
+            notes=notes,
+        )
+    )
+    application.status = to_status
+
+    await db.commit()
+    await db.refresh(application)
+    return application
+
+
+async def get_application_detail(db: AsyncSession, application_id: str) -> ApplicationDetailOut:
+    """Everything an underwriter needs on one screen to decide an
+    application: applicant details, the customer, the quote they picked
+    (with provider/product names resolved), the vehicle or insured asset,
+    every uploaded document, and the full decision/notes history."""
+    application = await db.get(Application, application_id)
+    if not application:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+    customer = await db.get(Customer, application.customer_id)
+    if not customer:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Customer on this application no longer exists")
+
+    quote = await db.get(Quote, application.quote_id)
+    if not quote:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Quote on this application no longer exists")
+    provider = await db.get(InsuranceProvider, quote.provider_id)
+    product = await db.get(InsuranceProduct, quote.product_id) if quote.product_id else None
+
+    vehicle = await db.get(Vehicle, application.vehicle_id) if application.vehicle_id else None
+    insured_asset = await db.get(InsuredAsset, application.insured_asset_id) if application.insured_asset_id else None
+
+    documents = (
+        await db.scalars(
+            select(ApplicationDocument)
+            .where(ApplicationDocument.application_id == application.id)
+            .order_by(ApplicationDocument.uploaded_at.asc())
+        )
+    ).all()
+    events = (
+        await db.scalars(
+            select(ApplicationEvent)
+            .where(ApplicationEvent.application_id == application.id)
+            .order_by(ApplicationEvent.created_at.desc())
+        )
+    ).all()
+
+    return ApplicationDetailOut(
+        id=application.id,
+        reference=application.reference,
+        status=application.status,
+        applicant_details=application.applicant_details,
+        provider_reference=application.provider_reference,
+        created_at=application.created_at,
+        updated_at=application.updated_at,
+        customer=ApplicationCustomerOut.model_validate(customer),
+        quote=ApplicationQuoteOut(
+            id=quote.id,
+            provider_name=provider.name if provider else "Unknown provider",
+            underlying_provider_name=quote.underlying_provider_name,
+            product_name=product.name if product else None,
+            premium=quote.premium,
+            taxes=quote.taxes,
+            fees=quote.fees,
+            total=quote.total,
+            currency=quote.currency,
+            coverage=quote.coverage,
+            exclusions=quote.exclusions,
+            deductibles=quote.deductibles,
+            is_mock=quote.is_mock,
+        ),
+        vehicle=ApplicationVehicleOut.model_validate(vehicle) if vehicle else None,
+        insured_asset=ApplicationInsuredAssetOut.model_validate(insured_asset) if insured_asset else None,
+        documents=documents,
+        events=events,
+    )
+
+
+async def get_application_document_url(db: AsyncSession, application_id: str, document_id: str) -> str:
+    """A short-lived signed URL so staff can actually open/view an uploaded
+    document (national ID, logbook, inspection report, ...) while deciding
+    an application - reuses the same storage abstraction document uploads
+    already go through; never returns a public/permanent link."""
+    document = await db.get(ApplicationDocument, document_id)
+    if not document or str(document.application_id) != str(application_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found on this application")
+
+    storage = get_storage()
+    return await storage.get_signed_url(document.storage_path)
