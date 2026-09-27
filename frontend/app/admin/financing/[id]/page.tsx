@@ -18,10 +18,13 @@ const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
 
 // Mirrors ALLOWED_STAFF_TRANSITIONS in app/services/financing_service.py -
 // the backend still enforces this independently, and also gates who may
-// set a custom interest rate while approving.
+// set a custom interest rate while approving. approved/rejected each list
+// the other as a correction path (an "override") in case the first
+// decision was a mistake.
 const NEXT_STEPS: Record<string, string[]> = {
   submitted: ["approved", "rejected"],
   rejected: ["approved"],
+  approved: ["rejected"],
 };
 
 const REQUIRED_DOCS_INDIVIDUAL = ["application_form", "logbook", "national_id", "kra_pin", "premium_quote"];
@@ -58,8 +61,12 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  async function decide(toStatus: string) {
+  async function decide(toStatus: string, isOverride: boolean) {
     if (!application) return;
+    if (isOverride && !notes.trim()) {
+      setError("A reason is required to change an existing approve/reject decision");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -92,13 +99,14 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
   }
 
   if (error && !application) {
-    return <main className="mx-auto max-w-4xl px-6 py-12 text-status-error">{error}</main>;
+    return <main className="mx-auto max-w-8xl px-3 py-4 text-status-error">{error}</main>;
   }
   if (!application) {
-    return <main className="mx-auto max-w-4xl px-6 py-12 text-ink-soft">Loading…</main>;
+    return <main className="mx-auto max-w-8xl px-3 py-4 text-ink-soft">Loading…</main>;
   }
 
   const nextSteps = NEXT_STEPS[application.status] ?? [];
+  const isOverride = application.status === "approved" || application.status === "rejected";
   const requiredDocTypes = application.is_corporate ? REQUIRED_DOCS_CORPORATE : REQUIRED_DOCS_INDIVIDUAL;
   const uploadedTypes = new Set(application.documents.map((d) => d.document_type));
 
@@ -289,7 +297,7 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
 
         <div className="flex flex-col gap-6">
           <Card>
-            <h2 className="font-semibold">Decision</h2>
+            <h2 className="font-semibold">{isOverride ? "Override decision" : "Decision"}</h2>
             {nextSteps.length === 0 ? (
               <p className="mt-2 text-sm text-ink-soft">
                 No decision is available while this application is &quot;{application.status.replace(/_/g, " ")}&quot;.
@@ -301,14 +309,24 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
                     Bidii Credit auto-rejected this application. Approving here is a management-approved exception.
                   </p>
                 )}
+                {isOverride && (
+                  <p className="mt-1 text-xs text-ink-soft">
+                    This application was already {application.status}. Use this to change the decision - a reason is
+                    required{application.status === "approved" ? " and any pending installments will be waived" : ""}.
+                  </p>
+                )}
                 <label className="mt-4 block text-sm font-medium text-ink" htmlFor="decision-notes">
-                  Notes
+                  {isOverride ? "Reason (required)" : "Notes"}
                 </label>
                 <textarea
                   id="decision-notes"
                   className="mt-1.5 w-full rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus:ring-2 focus:ring-brand-deep/40 focus:border-brand-deep"
                   rows={4}
-                  placeholder="Add context for this decision (optional, but recommended)…"
+                  placeholder={
+                    isOverride
+                      ? "Why is this decision being changed?"
+                      : "Add context for this decision (optional, but recommended)…"
+                  }
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={busy}
@@ -335,10 +353,14 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
                     <Button
                       key={step}
                       variant={step === "rejected" ? "ghost" : "primary"}
-                      disabled={busy}
-                      onClick={() => decide(step)}
+                      disabled={busy || (isOverride && !notes.trim())}
+                      onClick={() => decide(step, isOverride)}
                     >
-                      {step === "approved" ? "Approve financing" : "Decline financing"}
+                      {isOverride
+                        ? `Change to ${step}`
+                        : step === "approved"
+                          ? "Approve financing"
+                          : "Decline financing"}
                     </Button>
                   ))}
                 </div>

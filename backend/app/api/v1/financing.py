@@ -163,7 +163,12 @@ async def transition(
 ):
     """Decide a financing application: approve or reject it, or - only for
     management/super_admin - approve one the credit provider auto-rejected,
-    optionally at a different interest rate than the standard 3.5%/3%."""
+    optionally at a different interest rate than the standard/preferred
+    rates. Also handles correcting a mistaken decision (approved ->
+    rejected or rejected -> approved) - open to any financing admin role,
+    unlike the rate override above, but requires a non-empty note as a
+    reason; service layer returns 400 if one isn't given, and 409 if the
+    agreement already has a paid installment."""
     if payload.interest_rate_monthly is not None and claims.get("role") not in ("management", "super_admin"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only management can approve a non-standard interest rate")
     return await transition_financing_application(

@@ -11,6 +11,7 @@ from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storag
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.asset import InsuredAsset, Vehicle
 from app.models.customer import Customer
+from app.models.policy import Policy
 from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.models.quote import Quote
 from app.schemas.application import (
@@ -21,14 +22,21 @@ from app.schemas.application import (
     ApplicationVehicleOut,
 )
 
-# Only forward transitions a staff member can make directly, mirroring
-# ALLOWED_STAFF_TRANSITIONS in claim_service.py. Kept to exactly what
-# approve_application already enforced (submitted -> approved) plus the
-# sibling "decline" path, since nothing in this codebase today puts an
-# application into "under_review" or "payment_pending" for staff to act on.
+# Forward decisions plus corrections. "submitted" -> approved/rejected is
+# the first underwriting decision (notes optional, as before). The reverse
+# pairs let staff correct a mistaken approve/reject - see OVERRIDE_TRANSITIONS
+# below, which requires a reason for exactly those reversal moves.
 ALLOWED_STAFF_TRANSITIONS: dict[str, set[str]] = {
     "submitted": {"approved", "rejected"},
+    "approved": {"rejected"},
+    "rejected": {"approved"},
 }
+
+# A transition that reverses a decision already made, rather than making
+# the first one - these require a non-empty reason (enforced in
+# transition_application below) so there's always an audit trail for why a
+# mistaken approve/reject was corrected.
+OVERRIDE_TRANSITIONS: set[tuple[str, str]] = {("approved", "rejected"), ("rejected", "approved")}
 
 
 def generate_application_reference() -> str:
@@ -150,6 +158,11 @@ async def transition_application(
     (declined), with an optional note, recorded permanently on
     ApplicationEvent. Same shape as claim_service.transition_claim.
 
+    Also handles correcting a mistaken decision (approved -> rejected or
+    rejected -> approved) - see OVERRIDE_TRANSITIONS, which requires a
+    reason for exactly those reversal moves so there's always a record of
+    why an existing decision was changed.
+
     This does not replace approve_application above - that function (and
     the /approve route + tests that call it) is left exactly as it was.
     """
@@ -164,10 +177,28 @@ async def transition_application(
             f"Cannot move application from '{application.status}' to '{to_status}' - allowed next steps: {sorted(allowed) or 'none'}",
         )
 
+    is_override = (application.status, to_status) in OVERRIDE_TRANSITIONS
+    if is_override and not (notes and notes.strip()):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A reason is required to change an existing approve/reject decision")
+
+    if is_override and application.status == "approved" and to_status == "rejected":
+        # A policy may already have been issued off this approval (see
+        # issue_policy in policy_service.py) - rejecting the application
+        # after the fact would leave a live policy pointing at a now-
+        # rejected application, so that has to be handled deliberately
+        # (e.g. cancelling the policy itself) rather than silently here.
+        existing_policy = await db.scalar(select(Policy).where(Policy.application_id == application.id))
+        if existing_policy:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Policy {existing_policy.policy_number} has already been issued for this application - "
+                "cancel or handle the policy first before rejecting the application it came from",
+            )
+
     db.add(
         ApplicationEvent(
             application_id=application.id,
-            event_type="status_changed",
+            event_type="status_override" if is_override else "status_changed",
             from_status=application.status,
             to_status=to_status,
             actor_user_id=actor_user_id,

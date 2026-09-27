@@ -61,11 +61,21 @@ REQUIRED_DOCUMENT_TYPES_CORPORATE = ("application_form", "logbook", "certificate
 
 # Staff decisions available from each status - mirrors ALLOWED_STAFF_TRANSITIONS
 # in application_service.py/claim_service.py. "rejected": {"approved"} is the
-# management override path for an application the mock provider auto-declined.
+# management override path for an application the mock provider auto-declined
+# (optionally with a different rate - see interest_rate_monthly_override
+# below). "approved": {"rejected"} is the same idea in reverse: correcting a
+# mistaken approval.
 ALLOWED_STAFF_TRANSITIONS: dict[str, set[str]] = {
     "submitted": {"approved", "rejected"},
     "rejected": {"approved"},
+    "approved": {"rejected"},
 }
+
+# A transition that reverses a decision already made, rather than making
+# the first one - requires a non-empty reason (enforced in
+# transition_financing_application below), same as the equivalent override
+# on insurance applications.
+OVERRIDE_TRANSITIONS: set[tuple[str, str]] = {("approved", "rejected"), ("rejected", "approved")}
 
 
 def generate_financing_reference() -> str:
@@ -343,9 +353,18 @@ async def transition_financing_application(
     - approve one the credit provider auto-rejected, optionally at a
     different interest rate than the standard/preferred rates. Only the
     interest rate is overridable this way; the fees already assessed at
-    application time are left as they were. Every decision is recorded on
-    FinancingEvent. Does not touch submit_application above, which still
-    runs its own automatic provider decision unchanged."""
+    application time are left as they were.
+
+    Also handles correcting a mistaken decision (approved -> rejected or
+    rejected -> approved) - see OVERRIDE_TRANSITIONS, which requires a
+    reason for exactly those reversal moves. Rejecting an already-approved
+    application cancels its agreement and waives any still-pending
+    installments, but refuses if an installment has already been paid -
+    that needs handling deliberately, not silently reversed here.
+
+    Every decision is recorded on FinancingEvent. Does not touch
+    submit_application above, which still runs its own automatic provider
+    decision unchanged."""
     application = await db.get(FinancingApplication, application_id)
     if not application:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Financing application not found")
@@ -357,7 +376,28 @@ async def transition_financing_application(
             f"Cannot move financing application from '{application.status}' to '{to_status}' - allowed next steps: {sorted(allowed) or 'none'}",
         )
 
+    is_override = (application.status, to_status) in OVERRIDE_TRANSITIONS
+    if is_override and not (notes and notes.strip()):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A reason is required to change an existing approve/reject decision")
+
     from_status = application.status
+
+    if is_override and from_status == "approved" and to_status == "rejected":
+        existing_agreement = await db.scalar(select(FinancingAgreement).where(FinancingAgreement.application_id == application.id))
+        if existing_agreement:
+            installments = (
+                await db.scalars(select(FinancingInstallment).where(FinancingInstallment.agreement_id == existing_agreement.id))
+            ).all()
+            if any(i.status == "paid" for i in installments):
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    "This agreement already has a paid installment - it can't be silently rejected. "
+                    "Cancel the agreement itself first if that's really intended.",
+                )
+            existing_agreement.status = "cancelled"
+            for installment in installments:
+                if installment.status == "pending":
+                    installment.status = "waived"
 
     if to_status == "approved":
         if interest_rate_monthly_override is not None:
@@ -388,7 +428,7 @@ async def transition_financing_application(
     db.add(
         FinancingEvent(
             financing_application_id=application.id,
-            event_type="status_changed",
+            event_type="status_override" if is_override else "status_changed",
             from_status=from_status,
             to_status=to_status,
             notes=notes,

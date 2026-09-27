@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import  get_current_claims, require_roles
+from app.core.security import get_current_claims, require_roles
 from app.models.application import Application
 from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.schemas.admin import ProductCreate, ProductOut, ProviderCreate, ProviderOut, ProviderUpdate
@@ -85,8 +85,8 @@ async def get_application(application_id: str, db: AsyncSession = Depends(get_db
     vehicle/asset, documents, and decision history - so an underwriter has
     everything needed to decide the application in one place."""
     return await get_application_detail(db, application_id)
- 
- 
+
+
 @router.post("/applications/{application_id}/transition", response_model=ApplicationOut)
 async def transition(
     application_id: str,
@@ -96,13 +96,15 @@ async def transition(
 ):
     """Decide a submitted application: move it to 'approved' (next stage)
     or 'rejected' (declined), with an optional note recorded against it.
-    Does not replace the existing /approve route above."""
+    Also handles correcting a mistaken decision (approved -> rejected or
+    rejected -> approved), which requires a non-empty note as a reason -
+    service layer returns 400 if one isn't given. Does not replace the
+    existing /approve route above."""
     return await transition_application(db, application_id, payload.to_status, claims.get("sub"), payload.notes)
- 
- 
+
+
 @router.get("/applications/{application_id}/documents/{document_id}/url")
 async def get_application_document_link(application_id: str, document_id: str, db: AsyncSession = Depends(get_db)):
     """A short-lived signed URL so staff can open an uploaded document."""
     url = await get_application_document_url(db, application_id, document_id)
     return {"url": url}
- 

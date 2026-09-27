@@ -20,9 +20,12 @@ const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
 
 // Mirrors ALLOWED_STAFF_TRANSITIONS in app/services/application_service.py
 // so the UI only offers valid next steps - the backend still enforces this
-// independently.
+// independently. approved/rejected each list the other as a correction
+// path (an "override") in case the first decision was a mistake.
 const NEXT_STEPS: Record<string, string[]> = {
   submitted: ["approved", "rejected"],
+  approved: ["rejected"],
+  rejected: ["approved"],
 };
 
 function formatLabel(key: string): string {
@@ -70,8 +73,12 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  async function decide(toStatus: string) {
+  async function decide(toStatus: string, isOverride: boolean) {
     if (!application) return;
+    if (isOverride && !notes.trim()) {
+      setError("A reason is required to change an existing approve/reject decision");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -102,13 +109,14 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
   }
 
   if (error && !application) {
-    return <main className="mx-auto max-w-8xl px-6 py-12 text-status-error">{error}</main>;
+    return <main className="mx-auto max-w-8xl px-3 py-4 text-status-error">{error}</main>;
   }
   if (!application) {
-    return <main className="mx-auto max-w-8xl px-6 py-12 text-ink-soft">Loading…</main>;
+    return <main className="mx-auto max-w-8xl px-3 py-4 text-ink-soft">Loading…</main>;
   }
 
   const nextSteps = NEXT_STEPS[application.status] ?? [];
+  const isOverride = application.status === "approved" || application.status === "rejected";
 
   return (
     <main className="mx-auto max-w-8xl px-3 py-4">
@@ -294,7 +302,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
         <div className="flex flex-col gap-6">
           <Card>
-            <h2 className="font-semibold">Decision</h2>
+            <h2 className="font-semibold">{isOverride ? "Override decision" : "Decision"}</h2>
             {nextSteps.length === 0 ? (
               <p className="mt-2 text-sm text-ink-soft">
                 No decision is available while this application is &quot;{application.status.replace(/_/g, " ")}&quot;.
@@ -302,16 +310,22 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
             ) : (
               <>
                 <p className="mt-1 text-xs text-ink-soft">
-                  Approving sends this application to the next stage (payment). Rejecting declines it.
+                  {isOverride
+                    ? `This application was already ${application.status}. Use this to change the decision - a reason is required.`
+                    : "Approving sends this application to the next stage (payment). Rejecting declines it."}
                 </p>
                 <label className="mt-4 block text-sm font-medium text-ink" htmlFor="decision-notes">
-                  Notes
+                  {isOverride ? "Reason (required)" : "Notes"}
                 </label>
                 <textarea
                   id="decision-notes"
                   className="mt-1.5 w-full rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-soft/60 focus:outline-none focus:ring-2 focus:ring-brand-deep/40 focus:border-brand-deep"
                   rows={4}
-                  placeholder="Add context for this decision (optional, but recommended)…"
+                  placeholder={
+                    isOverride
+                      ? "Why is this decision being changed?"
+                      : "Add context for this decision (optional, but recommended)…"
+                  }
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={busy}
@@ -321,10 +335,14 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                     <Button
                       key={step}
                       variant={step === "rejected" ? "ghost" : "primary"}
-                      disabled={busy}
-                      onClick={() => decide(step)}
+                      disabled={busy || (isOverride && !notes.trim())}
+                      onClick={() => decide(step, isOverride)}
                     >
-                      {step === "approved" ? "Approve - send to next stage" : "Decline application"}
+                      {isOverride
+                        ? `Change to ${step}`
+                        : step === "approved"
+                          ? "Approve - send to next stage"
+                          : "Decline application"}
                     </Button>
                   ))}
                 </div>
