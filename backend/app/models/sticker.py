@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +34,12 @@ class Sticker(Base):
     # Encodes reference + policy_number only - never PII - for a real QR
     # generator to render client-side. No QR image is generated server-side
     # yet; this is the data contract, not a rendering pipeline.
+    valid_from: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    valid_to: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    # Set only for a sticker issued against one leg of a monthly payment
+    # plan (app/services/motor_terms.py) - covers just that month. NULL on
+    # every other sticker, meaning "covers the whole policy term", exactly
+    # as before these columns existed.
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

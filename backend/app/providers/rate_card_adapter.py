@@ -70,6 +70,12 @@ class RateCardAdapter(InsuranceProviderAdapter):
             "summary": f"{breakdown.vehicle_class_label} - {breakdown.cover_type.upper()} cover",
             "extensions": breakdown.extensions,
         }
+        if breakdown.free_benefits:
+            # What comprehensive (or TPO) cover already includes, at no
+            # extra cost - shown alongside the priced extras above so the
+            # customer sees the whole picture at quote time, same as a
+            # broker's own printed rate card would show it.
+            coverage["free_benefits"] = breakdown.free_benefits
         if breakdown.assumptions:
             coverage["assumptions"] = breakdown.assumptions
         if breakdown.data_confidence != "verified":
@@ -77,6 +83,15 @@ class RateCardAdapter(InsuranceProviderAdapter):
                 "This rate is transcribed from a source document that did not parse cleanly and has not yet "
                 "been verified against the original rate card - confirm before binding a real policy."
             )
+
+        payment_options: dict[str, Any] = {"methods": ["mpesa", "card", "bank_transfer"], "installments_allowed": True}
+        if breakdown.payment_plans:
+            # Every concrete way the customer can pay for THIS quote,
+            # already priced against its total - see
+            # app/services/motor_terms.py for the schedule shape. Absent
+            # when the broker hasn't configured any plans, in which case
+            # the customer simply pays in full as before.
+            payment_options["plans"] = breakdown.payment_plans
 
         return NormalizedQuote(
             provider_id=self.provider_id,
@@ -88,7 +103,7 @@ class RateCardAdapter(InsuranceProviderAdapter):
             coverage=coverage,
             exclusions={"items": ["Wear and tear", "Consequential loss", "Driving under the influence"]},
             deductibles={"excesses": breakdown.excesses} if breakdown.excesses else {},
-            payment_options={"methods": ["mpesa", "card", "bank_transfer"], "installments_allowed": True},
+            payment_options=payment_options,
             metadata={
                 "quote_basis": "published_rate_card",
                 "source_document": breakdown.source_document,

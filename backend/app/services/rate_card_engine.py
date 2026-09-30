@@ -11,13 +11,16 @@ through the full quote-request flow.
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardTier, RateCardVehicleClass
+from app.models.provider import InsuranceProvider
+from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardFreeBenefit, RateCardTier, RateCardVehicleClass
+from app.services import motor_terms
 
 # Kenyan motor insurance statutory levies (industry-standard, not
 # insurer-specific): Policyholders Compensation Fund 0.25% of gross
@@ -29,6 +32,18 @@ TRAINING_LEVY_RATE = Decimal("0.0020")
 STAMP_DUTY = Decimal("40.00")
 
 TWO_PLACES = Decimal("0.01")
+
+
+class RateCardIneligible(Exception):
+    """Raised when a vehicle falls outside a class's configured
+    comprehensive eligibility limits (min sum insured / max vehicle age)
+    and that class's comprehensive_ineligible_action is "decline". The
+    default action, "downgrade_to_tpo", never raises this - it re-prices
+    as Third Party Only instead (see compute_motor_premium)."""
+
+    def __init__(self, reasons: list[str]):
+        self.reasons = reasons
+        super().__init__("; ".join(reasons))
 
 
 class RateCardNotConfigured(Exception):
@@ -160,9 +175,23 @@ class RateCardQuoteBreakdown:
     stamp_duty: Decimal = Decimal("0")
     total: Decimal = Decimal("0")
     excesses: list[dict[str, Any]] = field(default_factory=list)
+    free_benefits: list[dict[str, Any]] = field(default_factory=list)
+    payment_plans: list[dict[str, Any]] = field(default_factory=list)
     data_confidence: str = "verified"
     source_document: str | None = None
     assumptions: list[str] = field(default_factory=list)
+
+
+async def _load_tiers(db: AsyncSession, vehicle_class_id, cover_type: str) -> list[RateCardTier]:
+    return list(
+        (
+            await db.scalars(
+                select(RateCardTier)
+                .where(RateCardTier.vehicle_class_id == vehicle_class_id, RateCardTier.cover_type == cover_type)
+                .order_by(RateCardTier.tier_order)
+            )
+        ).all()
+    )
 
 
 async def compute_motor_premium(
@@ -181,19 +210,42 @@ async def compute_motor_premium(
     if not vehicle_class:
         raise RateCardNotConfigured(f"No active '{class_code}' vehicle class configured for this provider.")
 
-    tiers = (
-        await db.scalars(
-            select(RateCardTier)
-            .where(RateCardTier.vehicle_class_id == vehicle_class.id, RateCardTier.cover_type == cover_type)
-            .order_by(RateCardTier.tier_order)
+    assumptions: list[str] = []
+
+    # Comprehensive eligibility (spec: comprehensive only for vehicles up
+    # to the broker's configured max age, and a broker-configured minimum
+    # sum insured). Only enforced when the class has actually been
+    # configured with one of these limits - a class left at the column
+    # defaults (both NULL) prices exactly as it always has.
+    if cover_type == "comprehensive" and (
+        vehicle_class.min_sum_insured is not None or vehicle_class.max_vehicle_age_years is not None
+    ):
+        sum_insured_for_check = _to_decimal(answers.get("value"))
+        eligibility = motor_terms.check_comprehensive_eligibility(
+            sum_insured=sum_insured_for_check,
+            vehicle_year=answers.get("year"),
+            min_sum_insured=vehicle_class.min_sum_insured,
+            max_vehicle_age_years=vehicle_class.max_vehicle_age_years,
+            today=date.today(),
         )
-    ).all()
+        assumptions.extend(eligibility.unchecked)
+        if not eligibility.eligible:
+            if vehicle_class.comprehensive_ineligible_action == "decline":
+                raise RateCardIneligible(eligibility.reasons)
+            cover_type = "tpo"
+            assumptions.append(
+                "Comprehensive cover is not available for this vehicle, so this quote is priced as Third "
+                "Party Only instead: " + " ".join(eligibility.reasons)
+            )
+
+    tiers = await _load_tiers(db, vehicle_class.id, cover_type)
     if not tiers:
         raise RateCardNotConfigured(
             f"'{vehicle_class.label}' has no {cover_type} rates configured for this provider yet."
         )
 
-    tier, assumptions = _select_tier(list(tiers), answers)
+    tier, tier_assumptions = _select_tier(tiers, answers)
+    assumptions.extend(tier_assumptions)
     sum_insured = _to_decimal(answers.get("value"))
     base_premium = _tier_amount(tier, sum_insured)
 
@@ -237,7 +289,10 @@ async def compute_motor_premium(
             else:
                 amount = ext.flat_amount or Decimal("0")
             extensions_total += amount
-            extensions_breakdown.append({"code": ext.code, "label": ext.label, "amount": str(amount.quantize(TWO_PLACES))})
+            entry = {"code": ext.code, "label": ext.label, "amount": str(amount.quantize(TWO_PLACES))}
+            if ext.limit_label or ext.limit_amount is not None:
+                entry["limit_label"] = ext.limit_label or f"Up to KES {ext.limit_amount:,.0f}"
+            extensions_breakdown.append(entry)
 
     subtotal = base_premium + extensions_total
     phcf = (subtotal * PHCF_RATE).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -256,6 +311,43 @@ async def compute_motor_premium(
         for row in excess_rows
     ]
 
+    # Included ("free") benefits for display alongside the quote - never
+    # priced. Same class-override-beats-provider-wide convention as
+    # extensions above, filtered to the cover type actually being priced
+    # (which may have changed above if this vehicle was downgraded to TPO).
+    free_rows = (
+        await db.scalars(
+            select(RateCardFreeBenefit).where(
+                RateCardFreeBenefit.provider_id == provider_id,
+                RateCardFreeBenefit.cover_type == cover_type,
+                RateCardFreeBenefit.is_active.is_(True),
+            )
+        )
+    ).all()
+    free_by_code: dict[str, RateCardFreeBenefit] = {}
+    for row in free_rows:
+        if row.vehicle_class_id == vehicle_class.id or row.vehicle_class_id is None:
+            if row.code not in free_by_code or row.vehicle_class_id == vehicle_class.id:
+                free_by_code[row.code] = row
+    free_benefits = [
+        {
+            "code": row.code,
+            "label": row.label,
+            "limit_label": row.limit_label or (f"Up to KES {row.limit_amount:,.0f}" if row.limit_amount is not None else None),
+            "top_up_note": row.top_up_note,
+        }
+        for row in sorted(free_by_code.values(), key=lambda r: r.label)
+    ]
+
+    # Broker-configured payment plans (pay in full / deposit + instalments
+    # / straight monthly with a sticker per payment), priced against the
+    # final total for this quote. Empty when the broker hasn't configured
+    # any - the customer then only sees "pay in full", same as before this
+    # field existed.
+    provider_row = await db.get(InsuranceProvider, provider_id)
+    configured_plans = (provider_row.payment_plans or {}).get("plans") if provider_row else None
+    payment_plans = motor_terms.build_all_options(configured_plans, total, cover_type)
+
     return RateCardQuoteBreakdown(
         vehicle_class_label=vehicle_class.label,
         cover_type=cover_type,
@@ -266,6 +358,8 @@ async def compute_motor_premium(
         training_levy=training_levy,
         stamp_duty=STAMP_DUTY,
         total=total,
+        free_benefits=free_benefits,
+        payment_plans=payment_plans,
         excesses=excesses,
         data_confidence=vehicle_class.data_confidence,
         source_document=vehicle_class.source_document,

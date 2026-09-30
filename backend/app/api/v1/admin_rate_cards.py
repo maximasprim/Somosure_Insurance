@@ -17,12 +17,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import require_roles
 from app.models.provider import InsuranceProvider
-from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardTier, RateCardVehicleClass
+from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardFreeBenefit, RateCardTier, RateCardVehicleClass
 from app.schemas.rate_card import (
     ExcessIn,
     ExcessOut,
     ExtensionIn,
     ExtensionOut,
+    FreeBenefitIn,
+    FreeBenefitOut,
+    PaymentPlanIn,
+    PaymentPlansUpdate,
     RateCardProviderCreate,
     RateCardProviderOut,
     RateCardQuotePreviewRequest,
@@ -33,7 +37,8 @@ from app.schemas.rate_card import (
     VehicleClassOut,
     VehicleClassUpdate,
 )
-from app.services.rate_card_engine import RateCardNotConfigured, compute_motor_premium
+from app.services import motor_terms
+from app.services.rate_card_engine import RateCardIneligible, RateCardNotConfigured, compute_motor_premium
 
 router = APIRouter(
     prefix="/api/v1/admin/rate-cards",
@@ -157,10 +162,14 @@ async def _load_class_detail(db: AsyncSession, class_id) -> RateCardVehicleClass
     excesses = (
         await db.scalars(select(RateCardExcess).where(RateCardExcess.vehicle_class_id == vehicle_class.id))
     ).all()
+    free_benefits = (
+        await db.scalars(select(RateCardFreeBenefit).where(RateCardFreeBenefit.vehicle_class_id == vehicle_class.id))
+    ).all()
     detail = VehicleClassDetailOut.model_validate(vehicle_class)
     detail.tiers = [TierOut.model_validate(t) for t in tiers]
     detail.extensions = [ExtensionOut.model_validate(e) for e in extensions]
     detail.excesses = [ExcessOut.model_validate(e) for e in excesses]
+    detail.free_benefits = [FreeBenefitOut.model_validate(b) for b in free_benefits]
     return detail
 
 
@@ -252,6 +261,95 @@ async def delete_extension(extension_id: str, db: AsyncSession = Depends(get_db)
     await db.commit()
 
 
+# --- Free (included) benefits -----------------------------------------
+
+
+@router.get("/providers/{provider_id}/free-benefits", response_model=list[FreeBenefitOut])
+async def list_free_benefits(provider_id: str, db: AsyncSession = Depends(get_db)):
+    await _get_provider_or_404(db, provider_id)
+    return (await db.scalars(select(RateCardFreeBenefit).where(RateCardFreeBenefit.provider_id == provider_id))).all()
+
+
+@router.post("/providers/{provider_id}/free-benefits", response_model=FreeBenefitOut, status_code=status.HTTP_201_CREATED)
+async def add_free_benefit(provider_id: str, payload: FreeBenefitIn, db: AsyncSession = Depends(get_db)):
+    await _get_provider_or_404(db, provider_id)
+    benefit = RateCardFreeBenefit(id=uuid.uuid4(), provider_id=provider_id, **payload.model_dump())
+    db.add(benefit)
+    await db.commit()
+    await db.refresh(benefit)
+    return benefit
+
+
+@router.patch("/free-benefits/{benefit_id}", response_model=FreeBenefitOut)
+async def update_free_benefit(benefit_id: str, payload: FreeBenefitIn, db: AsyncSession = Depends(get_db)):
+    benefit = await db.get(RateCardFreeBenefit, benefit_id)
+    if not benefit:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Free benefit not found")
+    for field, value in payload.model_dump(exclude={"vehicle_class_id"}).items():
+        setattr(benefit, field, value)
+    await db.commit()
+    await db.refresh(benefit)
+    return benefit
+
+
+@router.delete("/free-benefits/{benefit_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_free_benefit(benefit_id: str, db: AsyncSession = Depends(get_db)):
+    benefit = await db.get(RateCardFreeBenefit, benefit_id)
+    if not benefit:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Free benefit not found")
+    await db.delete(benefit)
+    await db.commit()
+
+
+# --- Payment plans -----------------------------------------------------
+
+
+@router.get("/providers/{provider_id}/payment-plans", response_model=list[PaymentPlanIn])
+async def get_payment_plans(provider_id: str, db: AsyncSession = Depends(get_db)):
+    provider = await _get_provider_or_404(db, provider_id)
+    return (provider.payment_plans or {}).get("plans") or []
+
+
+@router.put("/providers/{provider_id}/payment-plans", response_model=list[PaymentPlanIn])
+async def set_payment_plans(provider_id: str, payload: PaymentPlansUpdate, db: AsyncSession = Depends(get_db)):
+    """Replaces this broker's whole payment-plan catalog in one call -
+    plans are small and edited together, so there's no per-plan CRUD.
+    Applies to every rate-card motor quote from this broker from the next
+    quote request onward; nothing already quoted or paid is affected."""
+    provider = await _get_provider_or_404(db, provider_id)
+    provider.payment_plans = {"plans": [p.model_dump() for p in payload.plans]}
+    await db.commit()
+    return payload.plans
+
+
+@router.post("/providers/{provider_id}/payment-plans/apply-template", response_model=list[PaymentPlanIn])
+async def apply_payment_plan_template(provider_id: str, db: AsyncSession = Depends(get_db)):
+    """Pre-fills this broker with a typical starter set of plans (pay in
+    full; 30% deposit + 3 or 4 monthly instalments; straight monthly with
+    a one-month sticker per payment) so an admin onboarding a new broker
+    doesn't have to type the shape out by hand - every figure is then
+    editable via PUT .../payment-plans as usual."""
+    provider = await _get_provider_or_404(db, provider_id)
+    plans = motor_terms.starter_template()["payment_plans"]
+    provider.payment_plans = {"plans": plans}
+    await db.commit()
+    return plans
+
+
+# --- Starter catalog (for onboarding a new broker) ----------------------
+
+
+@router.get("/starter-template")
+async def get_starter_template():
+    """The full suggested starting point for a new broker's motor terms -
+    eligibility defaults, payment plans, and the standard catalog of free
+    and extra-benefit codes (see app/services/motor_terms.py) - so the
+    admin UI can pre-fill a new broker's setup form. Nothing here is
+    applied to any provider until the admin saves it against one.
+    """
+    return motor_terms.starter_template()
+
+
 # --- Excesses ------------------------------------------------------------
 
 
@@ -288,6 +386,8 @@ async def preview_quote(provider_id: str, payload: RateCardQuotePreviewRequest, 
     await _get_provider_or_404(db, provider_id)
     try:
         breakdown = await compute_motor_premium(db, provider_id, payload.answers)
+    except RateCardIneligible as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "; ".join(exc.reasons)) from exc
     except RateCardNotConfigured as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
@@ -301,6 +401,8 @@ async def preview_quote(provider_id: str, payload: RateCardQuotePreviewRequest, 
         "training_levy": str(breakdown.training_levy),
         "stamp_duty": str(breakdown.stamp_duty),
         "total": str(breakdown.total),
+        "free_benefits": breakdown.free_benefits,
+        "payment_plans": breakdown.payment_plans,
         "data_confidence": breakdown.data_confidence,
         "assumptions": breakdown.assumptions,
     }

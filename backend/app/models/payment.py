@@ -33,6 +33,25 @@ class Payment(Base):
 
     payer_phone: Mapped[str | None] = mapped_column(String(30))
 
+    # Set only when this payment was made against a configured payment
+    # plan (app/services/motor_terms.py) rather than paid in full in one
+    # go - NULL for every payment made the original way.
+    plan_code: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    installment_sequence: Mapped[int | None] = mapped_column(nullable=True)
+    # 1-based position of THIS payment within its plan's schedule
+    total_amount: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
+    # The full premium the plan is against - distinct from `amount`
+    # above, which is just this leg's amount
+    schedule: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # The full schedule this leg was priced from, as computed by
+    # motor_terms.build_plan_options at the time the FIRST leg was
+    # initiated - kept so later legs price off the same numbers rather
+    # than whatever the rate card looks like by then
+    root_payment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("payments.id"), nullable=True)
+    # Points at the first leg of this plan; NULL on that first leg itself.
+    # Lets initiate_next_installment() find "how many legs of this plan
+    # have been paid so far" with one query instead of walking a chain.
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

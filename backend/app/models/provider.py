@@ -41,6 +41,14 @@ class InsuranceProvider(Base):
     # active | inactive | maintenance | manual_only
     integration_version: Mapped[str | None] = mapped_column(String(20))
 
+    payment_plans: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Broker-configurable payment plans for rate-card products (motor
+    # today): {"plans": [{"code": "deposit_30", "type": "installments",
+    # "deposit_percent": "30", "installment_options": [3, 4], ...}]}.
+    # Shape and defaults live in app/services/motor_terms.py. Empty dict
+    # (the default) means "pay in full only" - unchanged behaviour for
+    # every provider that hasn't configured plans.
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -105,10 +105,18 @@ async def generate_sticker(db: AsyncSession, context: dict, config: dict) -> dic
         policy_id=policy_id,
         status="pending",
         qr_payload=f"{reference}|{context.get('policy_number', '')}",
+        valid_from=context.get("valid_from"),
+        valid_to=context.get("valid_to"),
+        # Set only when this sticker is one month of a monthly payment
+        # plan (see payment_service.handle_mpesa_webhook); otherwise both
+        # stay NULL, meaning "covers the whole policy term" as before.
     )
     db.add(sticker)
     await db.flush()
-    db.add(StickerEvent(sticker_id=sticker.id, from_status=None, to_status="pending", notes="Auto-created on policy activation"))
+    note = "Auto-created on policy activation"
+    if context.get("valid_from"):
+        note = f"Auto-created for monthly plan cover {context['valid_from']} to {context.get('valid_to')}"
+    db.add(StickerEvent(sticker_id=sticker.id, from_status=None, to_status="pending", notes=note))
     return {"sticker_id": str(sticker.id), "reference": reference}
 
 

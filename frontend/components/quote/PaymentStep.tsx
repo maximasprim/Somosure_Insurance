@@ -8,19 +8,25 @@ import { Badge } from "@/components/ui/Badge";
 import { FinancingOption } from "@/components/quote/FinancingOption";
 import { FinancingDocumentsStep } from "@/components/quote/FinancingDocumentsStep";
 import { api } from "@/lib/api";
-import type { FinancingApplicationResult, PaymentInitiateResult, PaymentStatusResult } from "@/lib/types";
+import type { FinancingApplicationResult, PaymentInitiateResult, PaymentPlanOption, PaymentStatusResult } from "@/lib/types";
+
+function formatKES(amount: string | number) {
+  return `KES ${Number(amount).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
+}
 
 export function PaymentStep({
   applicationId,
   customerId,
   quoteId,
   amount,
+  paymentPlans,
   onPaid,
 }: {
   applicationId: string;
   customerId: string;
   quoteId: string;
   amount: string;
+  paymentPlans?: PaymentPlanOption[];
   onPaid: () => void;
 }) {
   const [phone, setPhone] = useState("");
@@ -30,13 +36,22 @@ export function PaymentStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A plan other than "pay in full" and financing (Bidii Credit) are two
+  // different ways of spreading the same premium out - offering both at
+  // once would double-count what's owed, so picking one hides the other.
+  const plans = paymentPlans ?? [];
+  const hasChoice = plans.length > 1;
+  const [selectedOption, setSelectedOption] = useState<PaymentPlanOption | null>(
+    paymentPlans?.find((p) => p.type === "full") ?? paymentPlans?.[0] ?? null
+  );
+
   const financingApproved = financing?.status === "approved";
 
   // Once financing is approved, only the deposit is collected via M-Pesa now
   // - the remainder is a separate Bidii Credit installment schedule, never
   // altering the insurance premium itself (spec §14). If Bidii Credit
   // rejected it, the full premium is still due here as normal.
-  const amountDue = financingApproved && financing ? financing.deposit_amount : amount;
+  const amountDue = financingApproved && financing ? financing.deposit_amount : selectedOption?.due_now ?? amount;
 
   async function handleInitiate() {
     setBusy(true);
@@ -48,6 +63,8 @@ export function PaymentStep({
         amount: amountDue,
         phone,
         method: "mpesa",
+        plan_code: !financingApproved && selectedOption && selectedOption.type !== "full" ? selectedOption.plan_code : undefined,
+        installments: !financingApproved && selectedOption && selectedOption.type !== "full" ? selectedOption.installments : undefined,
       });
       setPayment(res);
     } catch (e) {
@@ -57,10 +74,25 @@ export function PaymentStep({
     }
   }
 
+  async function handleNextInstallment() {
+    if (!payment) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<PaymentInitiateResult>(`/api/v1/payments/${payment.payment_id}/next-installment`, { phone });
+      setPayment(res);
+      setStatus(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start the next instalment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function pollStatus(paymentId: string) {
     const res = await api.get<PaymentStatusResult>(`/api/v1/payments/${paymentId}/status`);
     setStatus(res);
-    if (res.status === "successful") onPaid();
+    if (res.status === "successful" && !payment?.remaining_schedule?.length) onPaid();
     return res.status;
   }
 
@@ -80,6 +112,8 @@ export function PaymentStep({
     }
   }
 
+  const remaining = status?.status === "successful" ? payment?.remaining_schedule ?? [] : [];
+
   return (
     <Card className="flex flex-col gap-5">
       <div>
@@ -87,15 +121,48 @@ export function PaymentStep({
         <p className="mt-1 text-sm text-ink-soft">
           {financingApproved && financing ? (
             <>
-              Deposit due now: <span className="font-semibold text-ink">KES {Number(amountDue).toLocaleString()}</span>
+              Deposit due now: <span className="font-semibold text-ink">{formatKES(amountDue)}</span>
               {" "}- remaining KES {Number(financing.financed_amount).toLocaleString()} financed over{" "}
               {financing.term_months} months with Bidii Credit at {financing.interest_rate_monthly}%/month.
             </>
           ) : (
-            <>Amount due: <span className="font-semibold text-ink">KES {Number(amount).toLocaleString()}</span></>
+            <>Amount due now: <span className="font-semibold text-ink">{formatKES(amountDue)}</span></>
           )}
         </p>
       </div>
+
+      {!payment && !financing && hasChoice && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-medium text-ink">How would you like to pay?</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {plans.map((opt) => (
+              <label
+                key={`${opt.plan_code}-${opt.installments}`}
+                className={`flex cursor-pointer flex-col gap-1 rounded-control border px-4 py-3 text-sm ${
+                  selectedOption?.plan_code === opt.plan_code && selectedOption?.installments === opt.installments
+                    ? "border-brand bg-brand-tint"
+                    : "border-neutral-border"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-medium text-ink">
+                  <input
+                    type="radio"
+                    name="payment_plan"
+                    checked={selectedOption?.plan_code === opt.plan_code && selectedOption?.installments === opt.installments}
+                    onChange={() => setSelectedOption(opt)}
+                  />
+                  {opt.label}
+                </span>
+                <span className="text-xs text-ink-soft">
+                  {formatKES(opt.due_now)} due now
+                  {opt.schedule.length > 1 ? `, then ${opt.schedule.length - 1} more payment(s)` : ""}
+                  {opt.sticker_months_per_payment ? ` - each payment covers ${opt.sticker_months_per_payment} month(s) of sticker` : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!payment && !financing && (
         <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} />
@@ -137,11 +204,35 @@ export function PaymentStep({
         </div>
       )}
 
-      {status && status.status === "successful" && (
+      {status && status.status === "successful" && remaining.length === 0 && (
         <div className="rounded-control bg-status-success/10 px-4 py-3 text-sm text-status-success">
           Payment confirmed. Your policy is being issued.
         </div>
       )}
+
+      {status && status.status === "successful" && remaining.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-control bg-status-success/10 px-4 py-3">
+          <p className="text-sm text-status-success">
+            Payment {payment?.installment_sequence} confirmed - your policy is issued and active.
+          </p>
+          <div className="rounded-control bg-white px-3 py-2 text-sm text-ink">
+            Next payment: <span className="font-semibold">{formatKES(remaining[0].amount)}</span> due{" "}
+            {new Date(remaining[0].due_date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+            {remaining[0].cover_to
+              ? ` (your sticker is valid until ${new Date(remaining[0].cover_to).toLocaleDateString("en-KE", { day: "numeric", month: "short" })})`
+              : ""}
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={handleNextInstallment} disabled={busy}>
+              {busy ? "Sending prompt…" : "Pay next instalment now"}
+            </Button>
+            <Button variant="ghost" onClick={onPaid}>
+              I'll pay later
+            </Button>
+          </div>
+        </div>
+      )}
+
       {status && status.status === "failed" && (
         <div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">
           Payment failed. Please try again.

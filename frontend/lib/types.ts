@@ -1,3 +1,35 @@
+export interface FreeBenefit {
+  code: string;
+  label: string;
+  limit_label: string | null;
+  top_up_note: string | null;
+}
+
+export interface PaymentScheduleLeg {
+  sequence: number;
+  kind: "full" | "deposit" | "installment";
+  due_date: string;
+  amount: string;
+  cover_from?: string;
+  cover_to?: string;
+}
+
+export interface PaymentPlanOption {
+  plan_code: string;
+  label: string;
+  type: "full" | "installments";
+  installments: number;
+  deposit_percent: string;
+  due_now: string;
+  sticker_months_per_payment: number | null;
+  schedule: PaymentScheduleLeg[];
+}
+
+export interface ExtraBenefitCatalogItem {
+  code: string;
+  label: string;
+}
+
 export interface NormalizedQuote {
   id: string;
   provider_id: string;
@@ -8,10 +40,10 @@ export interface NormalizedQuote {
   fees: string;
   total: string;
   currency: string;
-  coverage: Record<string, unknown>;
+  coverage: Record<string, unknown> & { free_benefits?: FreeBenefit[]; assumptions?: string[] };
   exclusions: Record<string, unknown>;
   deductibles: Record<string, unknown>;
-  payment_options: Record<string, unknown>;
+  payment_options: Record<string, unknown> & { plans?: PaymentPlanOption[] };
   provider_metadata: Record<string, unknown>;
   is_mock: boolean;
   valid_until: string | null;
@@ -119,6 +151,9 @@ export interface PaymentInitiateResult {
   status: string;
   provider_transaction_id: string;
   is_mock: boolean;
+  plan_code?: string | null;
+  installment_sequence?: number | null;
+  remaining_schedule?: PaymentScheduleLeg[] | null;
 }
 
 export interface PaymentStatusResult {

@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { api } from "@/lib/api";
+import type { ExtraBenefitCatalogItem } from "@/lib/types";
 
 // Kept intentionally short for the initial quote - the platform should ask
 // only what's needed to price the risk, not everything up front (spec §53:
@@ -28,6 +31,7 @@ export const motorQuoteSchema = z.object({
   seating_capacity: z.coerce.number().int().positive().optional(),
   owner_name: z.string().min(2, "Enter the owner's full name"),
   owner_phone: z.string().min(10, "Enter a valid phone number"),
+  extensions: z.array(z.string()).optional(),
 });
 
 export type MotorQuoteFormValues = z.infer<typeof motorQuoteSchema>;
@@ -62,6 +66,26 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
   } = useForm<MotorQuoteFormValues>({ resolver: zodResolver(motorQuoteSchema), defaultValues: { usage: "private" } });
 
   const usage = useWatch({ control, name: "usage" });
+  const value = useWatch({ control, name: "value" });
+  const year = useWatch({ control, name: "year" });
+  const coverType = useWatch({ control, name: "cover_type" });
+
+  const [extraBenefits, setExtraBenefits] = useState<ExtraBenefitCatalogItem[]>([]);
+  useEffect(() => {
+    api
+      .get<{ extensions: ExtraBenefitCatalogItem[] }>("/api/v1/quotes/motor/extra-benefit-catalog")
+      .then((res) => setExtraBenefits(res.extensions))
+      .catch(() => {
+        /* the extras step is a nice-to-have, not a blocker - the customer can still get a quote without it */
+      });
+  }, []);
+
+  // A soft, client-side heads-up only - the real eligibility check runs
+  // per-broker on the backend (each broker's own comprehensive minimum
+  // and maximum vehicle age may differ), so this never blocks submission.
+  const vehicleAge = year ? new Date().getFullYear() - Number(year) : null;
+  const possiblyIneligible =
+    coverType === "comprehensive" && ((vehicleAge !== null && vehicleAge > 15) || (value && Number(value) < 500000));
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5 sm:grid-cols-2">
@@ -87,6 +111,12 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
           <option value="third_party">Third Party</option>
           <option value="third_party_fire_theft">Third Party, Fire &amp; Theft</option>
         </select>
+        {possiblyIneligible && (
+          <p className="text-xs text-amber-600">
+            Comprehensive cover usually needs a vehicle value of at least KES 500,000 and an age of 15 years or
+            under - this varies by insurer, so we'll still show you what's available.
+          </p>
+        )}
       </div>
 
       {usage === "psv" && (
@@ -139,6 +169,24 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
           driving-school car. Leave on &quot;match automatically&quot; otherwise.
         </p>
       </div>
+
+      {extraBenefits.length > 0 && (
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <label className="text-sm font-medium text-ink">Optional extra benefits (adds to the premium)</label>
+          <p className="text-xs text-neutral-500">
+            Tick anything you'd like included - availability and price for each depends on the insurer, so you'll
+            see exactly what's offered and at what cost on the comparison page.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {extraBenefits.map((item) => (
+              <label key={item.code} className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" value={item.code} {...register("extensions")} className="h-4 w-4 rounded border-neutral-border" />
+                {item.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Input label="Owner's full name" {...register("owner_name")} error={errors.owner_name?.message} />
       <Input label="Owner's phone" placeholder="07XX XXX XXX" {...register("owner_phone")} error={errors.owner_phone?.message} />

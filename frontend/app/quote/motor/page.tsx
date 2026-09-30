@@ -139,6 +139,7 @@ export default function MotorQuotePage() {
           customerId={customerId}
           quoteId={selectedQuote.id}
           amount={selectedQuote.total}
+          paymentPlans={selectedQuote.payment_options.plans}
           onPaid={() => setStep("done")}
         />
       )}

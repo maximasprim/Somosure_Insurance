@@ -5,12 +5,19 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.payment import Payment
 from app.payments.mock_mpesa import MockMpesaProvider
-from app.schemas.payment import PaymentInitiateRequest, PaymentInitiateResponse, PaymentOut
-from app.services.payment_service import handle_mpesa_webhook, initiate_payment
+from app.schemas.payment import NextInstallmentRequest, PaymentInitiateRequest, PaymentInitiateResponse, PaymentOut
+from app.services.payment_service import handle_mpesa_webhook, initiate_next_installment, initiate_payment
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 webhook_router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 settings = get_settings()
+
+
+def _remaining_schedule(payment: Payment) -> list[dict] | None:
+    if not payment.schedule:
+        return None
+    done = payment.installment_sequence or 0
+    return [leg for leg in payment.schedule if int(leg["sequence"]) > done] or None
 
 
 @router.post("/initiate", response_model=PaymentInitiateResponse)
@@ -22,12 +29,34 @@ async def initiate(payload: PaymentInitiateRequest, db: AsyncSession = Depends(g
         amount=str(payload.amount),
         phone=payload.phone,
         method=payload.method,
+        plan_code=payload.plan_code,
+        installments=payload.installments,
     )
     return PaymentInitiateResponse(
         payment_id=str(payment.id),
         reference=payment.reference,
         status=payment.status,
         provider_transaction_id=provider_txn_id,
+        plan_code=payment.plan_code,
+        installment_sequence=payment.installment_sequence,
+        remaining_schedule=_remaining_schedule(payment),
+    )
+
+
+@router.post("/{payment_id}/next-installment", response_model=PaymentInitiateResponse)
+async def next_installment(payment_id: str, payload: NextInstallmentRequest, db: AsyncSession = Depends(get_db)):
+    """Pays the next not-yet-paid leg of a plan started by /initiate.
+    `payment_id` is any earlier leg of that same plan (usually the first).
+    """
+    payment, provider_txn_id = await initiate_next_installment(db, payment_id, payload.phone)
+    return PaymentInitiateResponse(
+        payment_id=str(payment.id),
+        reference=payment.reference,
+        status=payment.status,
+        provider_transaction_id=provider_txn_id,
+        plan_code=payment.plan_code,
+        installment_sequence=payment.installment_sequence,
+        remaining_schedule=_remaining_schedule(payment),
     )
 
 

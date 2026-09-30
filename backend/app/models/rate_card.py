@@ -61,6 +61,12 @@ class RateCardVehicleClass(Base):
 
     min_sum_insured: Mapped[Numeric | None] = mapped_column(Numeric(14, 2))
     max_vehicle_age_years: Mapped[int | None] = mapped_column()
+    comprehensive_ineligible_action: Mapped[str] = mapped_column(String(20), default="downgrade_to_tpo")
+    # downgrade_to_tpo | decline - what happens when a vehicle falls
+    # outside min_sum_insured / max_vehicle_age_years above and comprehensive
+    # was requested. Only consulted when one of those two limits is set;
+    # leaving both NULL (the default) enforces nothing, exactly as before
+    # this field existed.
 
     source_document: Mapped[str | None] = mapped_column(String(500))
     # e.g. "AMACO Rating Guide - 2026 Revised Motor Rates (circulated 2 Jul 2026)"
@@ -139,6 +145,49 @@ class RateCardExtension(Base):
     flat_amount: Mapped[Numeric | None] = mapped_column(Numeric(14, 2))
     min_amount: Mapped[Numeric | None] = mapped_column(Numeric(14, 2))
     notes: Mapped[str | None] = mapped_column(Text)
+
+    limit_amount: Mapped[Numeric | None] = mapped_column(Numeric(14, 2))
+    limit_label: Mapped[str | None] = mapped_column(String(150))
+    # Display-only cover limit shown to the customer alongside the price,
+    # e.g. "Up to KES 30,000". Never affects the premium calculation.
+
+
+class RateCardFreeBenefit(Base):
+    """An included ("free") benefit shown alongside a comprehensive quote -
+    windscreen, third party property damage, towing, and so on. Unlike
+    RateCardExtension these are never priced; they exist purely so the
+    customer sees what comprehensive cover already includes and up to what
+    limit, exactly as a broker's own rate card would show it.
+
+    `vehicle_class_id` NULL means "applies to every class for this
+    provider", same convention as RateCardExtension.vehicle_class_id.
+    A broker with no rows here simply shows no free-benefits section -
+    fully optional, nothing to configure unless the broker wants to.
+    """
+
+    __tablename__ = "rate_card_free_benefits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("insurance_providers.id"), nullable=False)
+    vehicle_class_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rate_card_vehicle_classes.id"))
+
+    code: Mapped[str] = mapped_column(String(50))
+    label: Mapped[str] = mapped_column(String(150))
+    limit_amount: Mapped[Numeric | None] = mapped_column(Numeric(14, 2))
+    limit_label: Mapped[str | None] = mapped_column(String(150))
+    # Free text as the source rate card phrases it, e.g. "Up to KES
+    # 30,000" or "KES 3,000,000 per person, unlimited per event" - kept
+    # alongside limit_amount because several of CIC's own limits aren't a
+    # single number (per person AND per event, or simply "Applicable").
+    top_up_note: Mapped[str | None] = mapped_column(String(255))
+    # e.g. "KES 1,000 for every additional KES 10,000 cover"
+    cover_type: Mapped[str] = mapped_column(String(20), default="comprehensive")
+    # comprehensive | tpo - which cover type this benefit applies to
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class RateCardExcess(Base):
