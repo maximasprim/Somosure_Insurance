@@ -18,11 +18,21 @@ class ProviderCreate(BaseModel):
 
 
 class ProviderUpdate(BaseModel):
+    """Every field is optional - PATCH sends only what changed
+    (`exclude_unset`), so this covers full-record editing, not just the
+    status toggle the original UI had."""
+
     name: str | None = None
+    provider_type: str | None = None
     status: str | None = None
     integration_mode: str | None = None
     supports_quote: bool | None = None
     supports_policy: bool | None = None
+    supports_payment: bool | None = None
+    supports_documents: bool | None = None
+    supports_claims: bool | None = None
+    supports_renewal: bool | None = None
+    supports_webhooks: bool | None = None
 
 
 class ProviderOut(BaseModel):
@@ -34,7 +44,10 @@ class ProviderOut(BaseModel):
     supports_quote: bool
     supports_policy: bool
     supports_payment: bool
+    supports_documents: bool
     supports_claims: bool
+    supports_renewal: bool
+    supports_webhooks: bool
 
     model_config = {"from_attributes": True}
     # Deliberately excludes api_base_url and credentials_secret_ref -
