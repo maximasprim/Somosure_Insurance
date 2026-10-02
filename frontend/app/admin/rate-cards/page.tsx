@@ -60,11 +60,10 @@ export default function RateCardProvidersPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Rate-card providers</h1>
       <p className="mt-1 text-ink-soft">
-        Brokers/insurers priced from a configured rate card rather than a live API - e.g. AMACO and Pioneer Insurance
-        Kenya. Add a new one when you receive a new broker&apos;s rate sheet; it stays inactive in customer quotes
+        Brokers/insurers priced from a configured rate card rather than a live API. It stays inactive in customer quotes
         until it has at least one vehicle class configured.
       </p>
 

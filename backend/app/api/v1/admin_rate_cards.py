@@ -317,7 +317,7 @@ async def set_payment_plans(provider_id: str, payload: PaymentPlansUpdate, db: A
     Applies to every rate-card motor quote from this broker from the next
     quote request onward; nothing already quoted or paid is affected."""
     provider = await _get_provider_or_404(db, provider_id)
-    provider.payment_plans = {"plans": [p.model_dump() for p in payload.plans]}
+    provider.payment_plans = {"plans": [p.model_dump(mode="json") for p in payload.plans]}
     await db.commit()
     return payload.plans
 

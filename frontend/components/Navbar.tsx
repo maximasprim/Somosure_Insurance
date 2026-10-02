@@ -62,8 +62,8 @@ export function Navbar() {
       className={`sticky top-0 z-40 border-b transition-colors ${scrolled ? "border-neutral-border bg-brand-tint/90 backdrop-blur" : "border-transparent bg-brand backdrop-blur-sm"
         }`}
     >
-      <div className="mx-auto flex max-w-8xl items-center justify-between px-2 py-1 md:px-3">
-        <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
+      <div className="mx-auto flex max-w-8xl items-center justify-between px-2 py-0.5 md:px-3">
+        <Link href="/" className="flex flex-col items-center font-display text-lg font-extrabold tracking-tight">
           {/* Somosure */}
           <Image
             src={SomosureLogo}
@@ -71,6 +71,7 @@ export function Navbar() {
             className="h-8 md:h-12 w-auto"
             priority
           />
+        <p className="text-xs text-ink-soft/70">Wealth.health.life</p>
         </Link>
 
         <div className="hidden items-center gap-8 text-sm font-medium text-ink-soft md:flex">
@@ -156,6 +157,7 @@ export function Navbar() {
                   {/* <span className="font-display text-lg font-extrabold text-brand">Somosure</span>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">Insurance</p> */}
                 </div>
+                <p className="text-xs">Wealth.health.life</p>
                 <button onClick={() => setMobileOpen(false)} aria-label="Close menu">
                   <X className="h-6 w-6" />
                 </button>

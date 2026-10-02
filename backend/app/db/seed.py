@@ -14,6 +14,9 @@ from app.db.rate_card_seed_data import (
     AMACO_CLASSES,
     AMACO_PROVIDER_EXTENSIONS,
     AMACO_SOURCE,
+    CIC_CLASSES,
+    CIC_PROVIDER_FREE_BENEFITS,
+    CIC_SOURCE_PRIVATE,
     PIONEER_CLASSES,
     PIONEER_PROVIDER_EXTENSIONS,
     PIONEER_SOURCE,
@@ -21,7 +24,7 @@ from app.db.rate_card_seed_data import (
 )
 from app.models.automation import AutomationRule
 from app.models.provider import InsuranceProvider
-from app.models.rate_card import RateCardExtension, RateCardTier, RateCardVehicleClass
+from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardFreeBenefit, RateCardTier, RateCardVehicleClass
 from app.models.user import Role
 
 ROLES = [
@@ -64,10 +67,14 @@ REAL_PROVIDER_CANDIDATES = [
     ("Britam", "insurer"),
     ("Jubilee Insurance", "insurer"),
     ("APA Insurance", "insurer"),
-    ("CIC Insurance Group", "insurer"),
     ("ICEA Lion", "insurer"),
     ("Old Mutual Kenya", "insurer"),
 ]
+# CIC used to sit in this list as an inactive, no-rates placeholder
+# pending real API access. It's been removed: CIC now has real, sourced
+# motor rates (see CIC_CLASSES in rate_card_seed_data.py) and is seeded
+# below as an active rate-card provider, the same way as AMACO and
+# Pioneer.
 
 # Default automation rules (spec §27). Editable/deactivatable from
 # /api/v1/admin/automation/rules once seeded - these are starting points,
@@ -120,17 +127,25 @@ DEFAULT_RULES = [
 ]
 
 
-_RATE_CARD_SOURCES = {"amaco": (AMACO_SOURCE, AMACO_CLASSES, AMACO_PROVIDER_EXTENSIONS),
-                      "pioneer insurance kenya": (PIONEER_SOURCE, PIONEER_CLASSES, PIONEER_PROVIDER_EXTENSIONS)}
+_RATE_CARD_SOURCES = {
+    "amaco": (AMACO_SOURCE, AMACO_CLASSES, AMACO_PROVIDER_EXTENSIONS, []),
+    "pioneer insurance kenya": (PIONEER_SOURCE, PIONEER_CLASSES, PIONEER_PROVIDER_EXTENSIONS, []),
+    "cic": (CIC_SOURCE_PRIVATE, CIC_CLASSES, [], CIC_PROVIDER_FREE_BENEFITS),
+    # CIC_SOURCE_PRIVATE is the fallback for classes that don't set their
+    # own "source_document" key - the private classes rely on it, the
+    # commercial ones below explicitly override to CIC_SOURCE_COMMERCIAL.
+}
 
 
 async def seed_rate_cards(db) -> tuple[int, int]:
-    """Seeds AMACO and Pioneer Insurance Kenya as real (non-mock)
+    """Seeds AMACO, Pioneer Insurance Kenya and CIC as real (non-mock)
     providers backed by RateCardAdapter, plus every vehicle class, tier,
-    and provider-wide extension transcribed from their rate cards (see
-    app/db/rate_card_seed_data.py). Idempotent: safe to re-run, and never
-    overwrites a class/tier an admin has since edited through
-    /api/v1/admin/rate-cards - it only inserts rows that don't exist yet.
+    excess, and provider-wide extension/free-benefit transcribed from
+    their rate cards (see app/db/rate_card_seed_data.py). Idempotent: safe
+    to re-run, and never overwrites a class/tier/extension/free-benefit an
+    admin has since edited through /api/v1/admin/rate-cards - it only
+    inserts rows that don't exist yet, matched by (provider, code) for
+    provider-wide rows and by (provider, class, code) for class-scoped ones.
     """
     providers_created = 0
     classes_created = 0
@@ -152,7 +167,7 @@ async def seed_rate_cards(db) -> tuple[int, int]:
             await db.flush()
             providers_created += 1
 
-        source_document, class_defs, provider_extensions = _RATE_CARD_SOURCES[key]
+        source_document, class_defs, provider_extensions, provider_free_benefits = _RATE_CARD_SOURCES[key]
 
         for class_def in class_defs:
             existing_class = await db.scalar(
@@ -164,7 +179,8 @@ async def seed_rate_cards(db) -> tuple[int, int]:
             if existing_class:
                 continue  # never clobber an admin's edits on re-seed
 
-            confidence = "needs_review" if key == "pioneer insurance kenya" else "verified"
+            default_confidence = "needs_review" if key == "pioneer insurance kenya" else "verified"
+            confidence = class_def.get("data_confidence", default_confidence)
             vehicle_class = RateCardVehicleClass(
                 id=uuid.uuid4(),
                 provider_id=provider.id,
@@ -173,7 +189,8 @@ async def seed_rate_cards(db) -> tuple[int, int]:
                 label=class_def["label"],
                 min_sum_insured=class_def.get("min_sum_insured"),
                 max_vehicle_age_years=class_def.get("max_vehicle_age_years"),
-                source_document=source_document,
+                comprehensive_ineligible_action=class_def.get("comprehensive_ineligible_action", "downgrade_to_tpo"),
+                source_document=class_def.get("source_document", source_document),
                 data_confidence=confidence,
                 notes=class_def.get("notes"),
             )
@@ -184,6 +201,11 @@ async def seed_rate_cards(db) -> tuple[int, int]:
             for tier_def in class_def["tiers"]:
                 db.add(RateCardTier(id=uuid.uuid4(), vehicle_class_id=vehicle_class.id, **tier_def))
 
+            for excess_def in class_def.get("excesses", []):
+                db.add(
+                    RateCardExcess(id=uuid.uuid4(), provider_id=provider.id, vehicle_class_id=vehicle_class.id, **excess_def)
+                )
+
             for ext_def in class_def.get("extensions", []):
                 db.add(
                     RateCardExtension(
@@ -191,6 +213,16 @@ async def seed_rate_cards(db) -> tuple[int, int]:
                         provider_id=provider.id,
                         vehicle_class_id=vehicle_class.id,
                         **ext_def,
+                    )
+                )
+
+            for benefit_def in class_def.get("free_benefits", []):
+                db.add(
+                    RateCardFreeBenefit(
+                        id=uuid.uuid4(),
+                        provider_id=provider.id,
+                        vehicle_class_id=vehicle_class.id,
+                        **benefit_def,
                     )
                 )
 
@@ -204,6 +236,18 @@ async def seed_rate_cards(db) -> tuple[int, int]:
             )
             if not existing_ext:
                 db.add(RateCardExtension(id=uuid.uuid4(), provider_id=provider.id, vehicle_class_id=None, **ext_def))
+
+        for benefit_def in provider_free_benefits:
+            existing_benefit = await db.scalar(
+                select(RateCardFreeBenefit).where(
+                    RateCardFreeBenefit.provider_id == provider.id,
+                    RateCardFreeBenefit.vehicle_class_id.is_(None),
+                    RateCardFreeBenefit.code == benefit_def["code"],
+                    RateCardFreeBenefit.cover_type == benefit_def.get("cover_type", "comprehensive"),
+                )
+            )
+            if not existing_benefit:
+                db.add(RateCardFreeBenefit(id=uuid.uuid4(), provider_id=provider.id, vehicle_class_id=None, **benefit_def))
 
     return providers_created, classes_created
 
@@ -280,7 +324,7 @@ async def seed() -> None:
             f"Seeded {len(ROLES)} roles, {len(DEMO_PROVIDERS)} demo providers, "
             f"1 demo aggregator, {len(REAL_PROVIDER_CANDIDATES)} real (pending-integration) providers, "
             f"{len(DEFAULT_RULES)} automation rules, and {rate_card_providers_created} rate-card provider(s) "
-            f"with {rate_card_classes_created} vehicle classes (AMACO + Pioneer Insurance Kenya)."
+            f"with {rate_card_classes_created} vehicle classes (AMACO + Pioneer Insurance Kenya + CIC)."
         )
 
 

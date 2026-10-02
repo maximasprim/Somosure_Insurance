@@ -24,7 +24,7 @@ import AmarcoLogo from "@/assets/Amarco_logo.png";
 import { ProductWheel } from "@/components/ProductWheel";
 
 const INSURE_OPTIONS = [
-  { category: "motor", name: "Car", href: "/quote/motor", desc: "Comprehensive or third-party cover for your car." },
+  { category: "motor", name: "Motor", href: "/quote/motor", desc: "Comprehensive or third-party cover for your vehicle." },
   { category: "medical", name: "Health", href: "/quote/medical", desc: "Individual or family medical cover." },
   { category: "home", name: "Home", href: "/quote/home", desc: "Cover for your house or apartment." },
   { category: "business", name: "Business", href: "/quote/business", desc: "Property, liability, or combined business cover." },
@@ -116,7 +116,7 @@ export default function HomePage() {
           priority
           className="-z-10 object-cover"
         />
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-brand/30" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-brand/25" />
 
         <div className="mx-auto grid max-w-7xl gap-10 px-6 pb-16 pt-14 md:grid-cols-2 md:gap-16 md:px-12 md:pt-24">
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
