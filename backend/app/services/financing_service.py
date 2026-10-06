@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storage
+from app.services.document_intake import screen_upload
 from app.financing.registry import get_credit_provider
 from app.models.customer import Customer
 from app.models.financing import (
@@ -20,6 +21,7 @@ from app.models.financing import (
     FinancingInstallment,
     FinancingSettings,
 )
+from app.models.crm import Lead, Task
 from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.models.quote import Quote
 from app.schemas.financing import (
@@ -152,6 +154,7 @@ async def check_eligibility(
     term_months: int,
     has_existing_logbook_loan: bool = False,
     logbook_loan_age_months: int | None = None,
+    is_corporate: bool = False,
 ) -> dict:
     settings = await get_financing_settings(db)
 
@@ -177,6 +180,19 @@ async def check_eligibility(
 
     deposit_percentage = Decimal("0.00") if concession_applied else settings.deposit_percentage_standard
     interest_rate_monthly = settings.interest_rate_preferred_monthly if concession_applied else settings.interest_rate_standard_monthly
+
+    # Company applicants can have their own deposit and/or rate, set by
+    # management in the financing settings. Each is optional: left blank
+    # means "same as standard", so nothing changes until someone sets one.
+    # The existing-customer concession above always takes precedence.
+    corporate_terms_applied = False
+    if is_corporate and not concession_applied:
+        if settings.corporate_deposit_percentage is not None:
+            deposit_percentage = settings.corporate_deposit_percentage
+            corporate_terms_applied = True
+        if settings.corporate_interest_rate_monthly is not None:
+            interest_rate_monthly = settings.corporate_interest_rate_monthly
+            corporate_terms_applied = True
 
     deposit = _round(quote.total * deposit_percentage / 100)
     financed_amount = quote.total - deposit
@@ -216,6 +232,7 @@ async def check_eligibility(
         "financed_amount": financed_amount,
         "interest_rate_monthly": interest_rate_monthly,
         "concession_applied": concession_applied,
+        "corporate_terms_applied": corporate_terms_applied,
         "loan_application_fee_pct": loan_application_fee_pct if result.eligible else settings.loan_application_fee_pct,
         "loan_application_fee": loan_application_fee,
         "life_insurance_fee_pct": life_insurance_fee_pct if result.eligible else settings.life_insurance_fee_pct,
@@ -226,6 +243,12 @@ async def check_eligibility(
         "term_months": term_months,
         "monthly_installment": monthly_installment,
         "is_mock": result.is_mock,
+        "concession_loan_age_max_months": settings.concession_loan_age_max_months,
+        "min_term_months": settings.min_term_months,
+        "max_term_months": settings.max_term_months,
+        "standard_deposit_percentage": settings.deposit_percentage_standard,
+        "standard_interest_rate_monthly": settings.interest_rate_standard_monthly,
+        "preferred_interest_rate_monthly": settings.interest_rate_preferred_monthly,
     }
 
 
@@ -238,7 +261,9 @@ async def submit_application(
     logbook_loan_age_months: int | None = None,
     is_corporate: bool = False,
 ) -> FinancingApplication:
-    eligibility = await check_eligibility(db, customer_id, quote_id, term_months, has_existing_logbook_loan, logbook_loan_age_months)
+    eligibility = await check_eligibility(
+        db, customer_id, quote_id, term_months, has_existing_logbook_loan, logbook_loan_age_months, is_corporate
+    )
     if not eligibility["eligible"]:
         raise HTTPException(status.HTTP_409_CONFLICT, eligibility["reason"] or "Not eligible for financing")
 
@@ -289,6 +314,7 @@ async def submit_application(
             )
         )
         await _create_agreement(db, application)
+        await _flag_zero_deposit_approval(db, application)
     elif result.status == "rejected":
         application.status = "rejected"
         application.rejection_reason = result.reason
@@ -305,6 +331,33 @@ async def submit_application(
     await db.commit()
     await db.refresh(application)
     return application
+
+
+async def _flag_zero_deposit_approval(db: AsyncSession, application: FinancingApplication) -> None:
+    """A financed customer with NO deposit never makes an M-Pesa payment, and
+    policies are otherwise activated by the payment confirmation - so with
+    nothing to pay, nothing would prompt staff to issue the policy. Create an
+    open staff task (visible on the admin tasks screen, linked to the
+    customer's open lead if there is one) and log it on the financing
+    timeline. Safe to call repeatedly: it won't create a duplicate."""
+    if Decimal(application.deposit_amount) != 0:
+        return
+    customer = await db.get(Customer, application.customer_id)
+    who = f"{customer.full_name} ({customer.phone})" if customer else "customer"
+    title = f"Issue policy - financing {application.reference} approved with no deposit - {who}"[:255]
+    if await db.scalar(select(Task).where(Task.title == title, Task.status == "open")):
+        return
+    lead = await db.scalar(
+        select(Lead).where(Lead.customer_id == application.customer_id, Lead.stage.notin_(["won", "lost"])).limit(1)
+    )
+    db.add(Task(title=title, lead_id=lead.id if lead else None, status="open"))
+    db.add(
+        FinancingEvent(
+            financing_application_id=application.id,
+            event_type="policy_issue_task",
+            notes="No deposit due - created a staff task to issue the policy.",
+        )
+    )
 
 
 async def _create_agreement(db: AsyncSession, application: FinancingApplication) -> FinancingAgreement:
@@ -420,6 +473,7 @@ async def transition_financing_application(
         existing_agreement = await db.scalar(select(FinancingAgreement).where(FinancingAgreement.application_id == application.id))
         if not existing_agreement:
             await _create_agreement(db, application)
+        await _flag_zero_deposit_approval(db, application)
     else:
         application.status = to_status
         if to_status == "rejected":
@@ -455,6 +509,11 @@ async def upload_financing_document(
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File exceeds the 10MB limit")
 
+    existing_docs = (
+        await db.scalars(select(FinancingDocument).where(FinancingDocument.financing_application_id == application.id))
+    ).all()
+    outcome = await screen_upload(document_type, file.filename or "document", content, existing_docs)
+
     storage = get_storage()
     storage_path = await storage.save(f"financing/{application_id}", file.filename or "document", content)
 
@@ -465,7 +524,9 @@ async def upload_financing_document(
         original_filename=file.filename or "document",
         content_type=file.content_type,
         size_bytes=len(content),
-        status="uploaded",
+        status=outcome.status,
+        validation_notes=outcome.notes,
+        file_hash=outcome.file_hash,
     )
     db.add(doc)
     db.add(

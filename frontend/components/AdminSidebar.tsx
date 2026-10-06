@@ -23,6 +23,7 @@ import {
   Home,
   UserCog,
   Handshake,
+  ScrollText,
   ListTodo,
   FileCheck2,
   CreditCard,
@@ -91,7 +92,10 @@ const SECTIONS: NavSection[] = [
   },
   {
     title: "Administration",
-    items: [{ label: "Staff & access", href: "/admin/users", icon: UserCog }],
+    items: [
+      { label: "Staff & access", href: "/admin/users", icon: UserCog },
+      { label: "Audit trail", href: "/admin/audit", icon: ScrollText },
+    ],
   },
 ];
 

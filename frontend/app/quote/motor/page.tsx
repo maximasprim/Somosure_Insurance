@@ -8,6 +8,10 @@ import { MotorQuoteForm, type MotorQuoteFormValues } from "@/components/quote/Mo
 import { QuoteComparison } from "@/components/quote/QuoteComparison";
 import { DocumentUploadStep } from "@/components/quote/DocumentUploadStep";
 import { PaymentStep } from "@/components/quote/PaymentStep";
+import { DocumentChecklistCard } from "@/components/quote/DocumentChecklistCard";
+import { ApprovalWaitStep } from "@/components/quote/ApprovalWaitStep";
+import { ResumeQuoteCard } from "@/components/quote/ResumeQuoteCard";
+import { clearQuoteSession, loadQuoteSession, saveQuoteSession, type SavedQuoteSession } from "@/lib/quoteSession";
 import { api, isLoggedIn } from "@/lib/api";
 import type { ApplicationResult, CustomerProfile, NormalizedQuote, QuoteRequestResult } from "@/lib/types";
 
@@ -19,7 +23,7 @@ import type { ApplicationResult, CustomerProfile, NormalizedQuote, QuoteRequestR
 // a logged-in one uses their real customer record fetched below.
 const GUEST_CUSTOMER_ID = "00000000-0000-0000-0000-000000000000";
 
-type Step = "form" | "compare" | "documents" | "awaiting_approval" | "payment" | "done";
+type Step = "form" | "compare" | "documents" | "awaiting_approval" | "payment" | "financed" | "done";
 
 export default function MotorQuotePage() {
   const [step, setStep] = useState<Step>("form");
@@ -29,6 +33,34 @@ export default function MotorQuotePage() {
   const [application, setApplication] = useState<ApplicationResult | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<NormalizedQuote | null>(null);
   const [customerId, setCustomerId] = useState(GUEST_CUSTOMER_ID);
+
+  // Save-and-resume (see lib/quoteSession.ts). Saved only up to "awaiting
+  // approval"; reaching payment clears it so a paid customer is never
+  // shown a second payment form on return.
+  const [resumable, setResumable] = useState<SavedQuoteSession | null>(null);
+  useEffect(() => {
+    setResumable(loadQuoteSession("motor"));
+  }, []);
+  useEffect(() => {
+    if ((step === "compare" || step === "documents" || step === "awaiting_approval") && result) {
+      saveQuoteSession({ category: "motor", step, result, customerId, application, selectedQuote });
+    } else if (step === "payment" || step === "financed" || step === "done") {
+      clearQuoteSession("motor");
+    }
+  }, [step, result, customerId, application, selectedQuote]);
+
+  function resumeSession(saved: SavedQuoteSession) {
+    setResult(saved.result);
+    setCustomerId(saved.customerId);
+    setApplication(saved.application);
+    setSelectedQuote(saved.selectedQuote);
+    setStep(saved.step);
+    setResumable(null);
+  }
+  function discardSession() {
+    clearQuoteSession("motor");
+    setResumable(null);
+  }
 
   useEffect(() => {
     if (isLoggedIn()) {
@@ -91,6 +123,7 @@ export default function MotorQuotePage() {
     documents: 2,
     awaiting_approval: 2,
     payment: 2,
+    financed: 3,
     done: 3,
   }[step];
 
@@ -107,6 +140,12 @@ export default function MotorQuotePage() {
         <div className="mb-6 rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">{error}</div>
       )}
 
+      {step === "form" && resumable && (
+        <div className="mb-6">
+          <ResumeQuoteCard saved={resumable} productLabel="Motor insurance" onResume={() => resumeSession(resumable)} onDiscard={discardSession} />
+        </div>
+      )}
+
       {step === "form" && (
         <Card>
           <MotorQuoteForm onSubmit={handleFormSubmit} submitting={submitting} />
@@ -114,23 +153,22 @@ export default function MotorQuotePage() {
       )}
 
       {step === "compare" && result && (
-        <QuoteComparison quotes={result.quotes} note={result.note} onSelect={handleSelectQuote} />
+        <div className="flex flex-col gap-6">
+          {result.quotes.length > 0 && <DocumentChecklistCard category="motor" />}
+          <QuoteComparison quotes={result.quotes} note={result.note} onSelect={handleSelectQuote} />
+        </div>
       )}
 
       {step === "documents" && application && (
         <DocumentUploadStep applicationId={application.id} onSubmitted={() => setStep("awaiting_approval")} />
       )}
 
-      {step === "awaiting_approval" && (
-        <Card className="flex flex-col items-start gap-3">
-          <h2 className="text-xl font-bold">Under review</h2>
-          <p className="text-ink-soft">
-            Your application <span className="font-semibold text-ink">{application?.reference}</span> is with our
-            underwriting team. You'll be notified as soon as it's approved and ready for payment - usually within a
-            few hours.
-          </p>
-          <Button onClick={() => setStep("payment")}>I've been notified it's approved - continue to payment</Button>
-        </Card>
+      {step === "awaiting_approval" && application && (
+        <ApprovalWaitStep
+          applicationId={application.id}
+          reference={application.reference}
+          onApproved={() => setStep("payment")}
+        />
       )}
 
       {step === "payment" && application && selectedQuote && (
@@ -141,7 +179,22 @@ export default function MotorQuotePage() {
           amount={selectedQuote.total}
           paymentPlans={selectedQuote.payment_options.plans}
           onPaid={() => setStep("done")}
+          onFinancedNoDeposit={() => setStep("financed")}
         />
+      )}
+
+      {step === "financed" && (
+        <Card className="flex flex-col items-start gap-3">
+          <h2 className="text-xl font-bold">Financing approved</h2>
+          <p className="text-ink-soft">
+            Application <span className="font-semibold text-ink">{application?.reference}</span> - your Bidii Credit financing
+            covers the premium, so no deposit is due. Our team will confirm with Bidii Credit and activate your policy, and
+            you&apos;ll be notified when it&apos;s live.
+          </p>
+          <Button variant="ghost" onClick={() => (window.location.href = "/")}>
+            Back to home
+          </Button>
+        </Card>
       )}
 
       {step === "done" && (

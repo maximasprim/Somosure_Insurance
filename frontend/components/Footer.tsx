@@ -9,9 +9,11 @@ const COLUMNS = [
       { label: "Motor", href: "/quote/motor" },
       { label: "Medical", href: "/quote/medical" },
       { label: "Life", href: "/quote/life" },
-      { label: "Home", href: "/quote/home" },
+      { label: "Property", href: "/quote/property" },
       { label: "Travel", href: "/quote/travel" },
-      { label: "Business", href: "/quote/business" },
+      { label: "Cargo", href: "/quote/cargo" },
+      { label: "Hull", href: "/quote/hull" },
+      { label: "Cybersecurity", href: "/quote/cybersecurity" },
     ],
   },
   {

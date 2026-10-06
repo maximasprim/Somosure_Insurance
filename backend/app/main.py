@@ -8,7 +8,9 @@ from slowapi.errors import RateLimitExceeded
 import app.models  # noqa: F401 - guarantees every model is registered on
 # Base.metadata regardless of which routes happen to import which model
 # classes directly (see app/models/__init__.py for why this matters).
-from app.api.v1 import admin, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
+from app.api.v1 import admin, admin_audit, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
+from app.audit.capture import install as install_audit_capture
+from app.audit.middleware import AuditMiddleware
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -32,6 +34,12 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Audit trail: record who did what (see docs/AUDIT_TRAIL.md). Change capture
+# hooks the database session; the middleware records each data-changing or
+# sensitive request with its outcome and the stated reason.
+install_audit_capture()
+app.add_middleware(AuditMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -44,6 +52,7 @@ app.include_router(auth.router)
 app.include_router(quotes.router)
 app.include_router(applications.router)
 app.include_router(policies.router)
+app.include_router(admin_audit.router)
 app.include_router(admin.router)
 app.include_router(admin_users.router)
 app.include_router(admin_users.roles_router)

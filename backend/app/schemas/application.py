@@ -19,6 +19,7 @@ class ApplicationDocumentOut(BaseModel):
     original_filename: str
     status: str
     uploaded_at: datetime
+    validation_notes: str | None = None
 
     model_config = {"from_attributes": True}
 

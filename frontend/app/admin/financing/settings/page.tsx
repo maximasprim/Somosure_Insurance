@@ -29,6 +29,18 @@ const FIELDS: { key: keyof FormState; label: string; hint?: string; suffix?: str
     suffix: "months",
     hint: "How recent an existing Bidii Credit logbook loan must be for the deposit, rate, and fee waivers to apply.",
   },
+  {
+    key: "corporate_deposit_percentage",
+    label: "Company applicant deposit (optional)",
+    suffix: "%",
+    hint: "Leave blank to charge companies the standard deposit. Existing-customer terms still take precedence.",
+  },
+  {
+    key: "corporate_interest_rate_monthly",
+    label: "Company applicant interest rate (optional)",
+    suffix: "%/month",
+    hint: "Leave blank to charge companies the standard interest rate.",
+  },
 ];
 
 function toFormState(s: FinancingSettings): FormState {
@@ -42,6 +54,8 @@ function toFormState(s: FinancingSettings): FormState {
     life_insurance_fee_pct: s.life_insurance_fee_pct,
     excise_duty_pct: s.excise_duty_pct,
     concession_loan_age_max_months: String(s.concession_loan_age_max_months),
+    corporate_deposit_percentage: s.corporate_deposit_percentage ?? "",
+    corporate_interest_rate_monthly: s.corporate_interest_rate_monthly ?? "",
   };
 }
 
@@ -51,6 +65,7 @@ export default function FinancingSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState("");
   const role = typeof window !== "undefined" ? getTokenRole() : null;
   const canEdit = role === "management" || role === "super_admin";
 
@@ -80,8 +95,13 @@ export default function FinancingSettingsPage() {
         life_insurance_fee_pct: form.life_insurance_fee_pct,
         excise_duty_pct: form.excise_duty_pct,
         concession_loan_age_max_months: Number(form.concession_loan_age_max_months),
+        // Blank = "same as standard" (null clears any value set earlier).
+        corporate_deposit_percentage: form.corporate_deposit_percentage.trim() === "" ? null : form.corporate_deposit_percentage,
+        corporate_interest_rate_monthly: form.corporate_interest_rate_monthly.trim() === "" ? null : form.corporate_interest_rate_monthly,
       };
+      // The reason is stored on the audit trail beside who changed what, and when.
       const updated = await api.patch<FinancingSettings>("/api/v1/admin/financing/settings", payload);
+      setReason("");
       setForm(toFormState(updated));
       setUpdatedAt(updated.updated_at);
       setSaved(true);
@@ -93,10 +113,10 @@ export default function FinancingSettingsPage() {
   }
 
   if (error && !form) {
-    return <main className="mx-auto max-w-2xl px-6 py-12 text-status-error">{error}</main>;
+    return <main className="mx-auto max-w-7xl px-3 py-4 text-status-error">{error}</main>;
   }
   if (!form) {
-    return <main className="mx-auto max-w-2xl px-6 py-12 text-ink-soft">Loading…</main>;
+    return <main className="mx-auto max-w-7xl px-3 py-4 text-ink-soft">Loading…</main>;
   }
 
   return (
@@ -142,6 +162,22 @@ export default function FinancingSettingsPage() {
 
         {error && <p className="text-sm text-status-error">{error}</p>}
         {saved && <p className="text-sm text-status-success">Saved.</p>}
+
+        {canEdit && (
+          <div>
+            <label htmlFor="settings-reason" className="text-sm font-medium text-ink">
+              Reason for this change (recorded in the audit trail)
+            </label>
+            <input
+              id="settings-reason"
+              type="text"
+              placeholder="e.g. New rates approved by the board"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="mt-1 w-full rounded-control border border-neutral-border bg-white px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-deep/40 focus:border-brand-deep"
+            />
+          </div>
+        )}
 
         {canEdit && (
           <Button onClick={save} disabled={busy}>

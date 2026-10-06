@@ -13,8 +13,11 @@ class ContactRequest(BaseModel):
     phone: str
     email: str | None = None
     message: str
+    product_interest: str | None = None
+    # Optional - set when the request is about a specific product category
+    # (e.g. "medical"), so the CRM lead is tagged with it.
 
 
 @router.post("")
 async def submit_contact(payload: ContactRequest, db: AsyncSession = Depends(get_db)):
-    return await submit_contact_message(db, payload.full_name, payload.phone, payload.email, payload.message)
+    return await submit_contact_message(db, payload.full_name, payload.phone, payload.email, payload.message, payload.product_interest)

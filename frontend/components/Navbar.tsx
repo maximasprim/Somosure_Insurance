@@ -15,12 +15,14 @@ const INSURANCE_LINKS = [
   { label: "Motor", href: "/quote/motor" },
   { label: "Medical", href: "/quote/medical" },
   { label: "Life", href: "/quote/life" },
-  { label: "Home", href: "/quote/home" },
+  { label: "Property", href: "/quote/property" },
   { label: "Travel", href: "/quote/travel" },
-  { label: "Business", href: "/quote/business" },
   { label: "Personal accident", href: "/quote/personal_accident" },
   { label: "Professional indemnity", href: "/quote/professional_indemnity" },
   { label: "WIBA", href: "/quote/wiba" },
+  { label: "Cargo", href: "/quote/cargo" },
+  { label: "Hull", href: "/quote/hull" },
+  { label: "Cybersecurity", href: "/quote/cybersecurity" },
 ];
 
 const NAV_LINKS = [

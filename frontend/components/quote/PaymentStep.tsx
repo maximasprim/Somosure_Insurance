@@ -21,6 +21,7 @@ export function PaymentStep({
   amount,
   paymentPlans,
   onPaid,
+  onFinancedNoDeposit,
 }: {
   applicationId: string;
   customerId: string;
@@ -28,6 +29,10 @@ export function PaymentStep({
   amount: string;
   paymentPlans?: PaymentPlanOption[];
   onPaid: () => void;
+  // Optional: called when financing is approved and NO deposit is due, so
+  // there is nothing to pay by M-Pesa. Callers that don't pass it simply
+  // get the explanatory message without a finish button.
+  onFinancedNoDeposit?: () => void;
 }) {
   const [phone, setPhone] = useState("");
   const [payment, setPayment] = useState<PaymentInitiateResult | null>(null);
@@ -46,6 +51,14 @@ export function PaymentStep({
   );
 
   const financingApproved = financing?.status === "approved";
+
+  // True while the customer has the financing panel open. Choosing
+  // financing replaces "pay by M-Pesa now": the M-Pesa form and the
+  // pay-in-instalments options step aside until financing is approved
+  // (and then only if a deposit is actually due).
+  const [financeMode, setFinanceMode] = useState(false);
+  const noDepositFinanced = financingApproved && financing !== null && Number(financing.deposit_amount) === 0;
+  const showMpesaForm = !payment && !noDepositFinanced && (!financeMode || financing !== null);
 
   // Once financing is approved, only the deposit is collected via M-Pesa now
   // - the remainder is a separate Bidii Credit installment schedule, never
@@ -125,13 +138,15 @@ export function PaymentStep({
               {" "}- remaining KES {Number(financing.financed_amount).toLocaleString()} financed over{" "}
               {financing.term_months} months with Bidii Credit at {financing.interest_rate_monthly}%/month.
             </>
+          ) : financeMode && !financing ? (
+            <>Choose your financing terms below - nothing is due by M-Pesa until your financing is approved.</>
           ) : (
             <>Amount due now: <span className="font-semibold text-ink">{formatKES(amountDue)}</span></>
           )}
         </p>
       </div>
 
-      {!payment && !financing && hasChoice && (
+      {!payment && !financing && hasChoice && !financeMode && (
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-ink">How would you like to pay?</p>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -165,7 +180,7 @@ export function PaymentStep({
       )}
 
       {!payment && !financing && (
-        <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} />
+        <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} onExpandedChange={setFinanceMode} />
       )}
 
       {financing && financingApproved && (
@@ -182,11 +197,25 @@ export function PaymentStep({
         </div>
       )}
 
-      {!payment && (
+      {noDepositFinanced && !payment && (
+        <div className="flex flex-col items-start gap-3 rounded-control bg-status-success/10 px-4 py-3 text-sm text-status-success">
+          <p>
+            No deposit is due - your financing covers the whole premium, so there&apos;s nothing to pay by M-Pesa now. Our
+            team will confirm with Bidii Credit and activate your policy.
+          </p>
+          {onFinancedNoDeposit && (
+            <Button onClick={onFinancedNoDeposit} size="lg">
+              Finish
+            </Button>
+          )}
+        </div>
+      )}
+
+      {showMpesaForm && (
         <>
           <Input label="M-Pesa phone number" placeholder="07XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
           <Button onClick={handleInitiate} disabled={busy || !phone} size="lg">
-            {busy ? "Sending prompt…" : "Pay with M-Pesa"}
+            {busy ? "Sending prompt…" : financingApproved ? `Pay ${formatKES(amountDue)} deposit with M-Pesa` : "Pay with M-Pesa"}
           </Button>
         </>
       )}

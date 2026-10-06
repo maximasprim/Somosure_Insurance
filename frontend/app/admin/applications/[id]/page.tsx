@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { AuditTimeline } from "@/components/AuditTimeline";
 import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
 import type { ApplicationDetail } from "@/lib/types";
@@ -289,6 +290,11 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                     <p className="text-xs text-ink-soft">
                       {doc.original_filename} · {doc.status} · {new Date(doc.uploaded_at).toLocaleDateString()}
                     </p>
+                    {doc.validation_notes && (
+                      <p className={`text-xs ${doc.status === "needs_review" ? "text-amber-700" : "text-ink-soft"}`}>
+                        {doc.validation_notes}
+                      </p>
+                    )}
                   </div>
                   <Button variant="ghost" onClick={() => viewDocument(doc.id)}>
                     View
@@ -366,6 +372,8 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
               {application.events.length === 0 && <p className="text-sm text-ink-soft">No activity yet.</p>}
             </div>
           </Card>
+
+          <AuditTimeline entityType="applications" entityId={application.id} />
         </div>
       </div>
     </main>

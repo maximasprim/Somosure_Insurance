@@ -82,6 +82,7 @@ export interface ApplicationDocument {
   original_filename: string;
   status: string;
   uploaded_at: string;
+  validation_notes?: string | null;
 }
 
 export interface ApplicationCustomer {
@@ -282,6 +283,7 @@ export interface EligibilityResult {
   financed_amount: string;
   interest_rate_monthly: string;
   concession_applied: boolean;
+  corporate_terms_applied?: boolean;
   loan_application_fee: string | null;
   life_insurance_fee: string | null;
   excise_duty_amount: string | null;
@@ -289,6 +291,13 @@ export interface EligibilityResult {
   term_months: number;
   monthly_installment: string | null;
   is_mock: boolean;
+  // Live admin-configured context (additive - older responses omit these).
+  concession_loan_age_max_months?: number | null;
+  min_term_months?: number | null;
+  max_term_months?: number | null;
+  standard_deposit_percentage?: string | null;
+  standard_interest_rate_monthly?: string | null;
+  preferred_interest_rate_monthly?: string | null;
 }
 
 export interface FinancingApplicationResult {
@@ -320,6 +329,7 @@ export interface FinancingDocument {
   original_filename: string;
   status: string;
   uploaded_at: string;
+  validation_notes?: string | null;
 }
 
 export interface FinancingEvent {
@@ -412,6 +422,8 @@ export interface FinancingSettings {
   life_insurance_fee_pct: string;
   excise_duty_pct: string;
   concession_loan_age_max_months: number;
+  corporate_deposit_percentage?: string | null;
+  corporate_interest_rate_monthly?: string | null;
   updated_at: string;
 }
 
@@ -456,3 +468,85 @@ export interface ClaimEvent {
   notes: string | null;
   created_at: string;
 }
+
+// --- Quote-journey helpers (document checklist, availability) ---
+
+export interface DocumentRequirement {
+  type: string;
+  label: string;
+  description: string;
+  tips: string[];
+  system_provided: boolean;
+}
+
+export interface DocumentRequirements {
+  category: string;
+  accepted_formats: string;
+  max_mb: number;
+  general_tips: string[];
+  insurance: DocumentRequirement[];
+  financing: { note: string; documents: DocumentRequirement[] };
+}
+
+export interface ChecklistItem {
+  type: string;
+  label: string;
+  description: string;
+  tips: string[];
+  state: "provided" | "missing" | "auto";
+  source: "uploaded" | "insurance_application" | "earlier_application" | "generated" | null;
+}
+
+export interface DocumentChecklist {
+  items: ChecklistItem[];
+  missing: string[];
+  complete: boolean;
+}
+
+export interface CategoryAvailability {
+  available: boolean;
+  mode: "live" | "demo" | "coming_soon";
+}
+
+// --- Audit trail ---
+
+export interface AuditEntry {
+  id: string;
+  seq: number;
+  occurred_at: string;
+  kind: "change" | "request" | "event";
+  action: string;
+  actor_type: "staff" | "customer" | "guest" | "system";
+  actor_user_id: string | null;
+  actor_name: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  entity_label: string | null;
+  related_customer_id: string | null;
+  summary: string | null;
+  reason: string | null;
+  changes: Record<string, [unknown, unknown]> | null;
+  details: Record<string, unknown> | null;
+  request_id: string | null;
+  method: string | null;
+  path: string | null;
+  status_code: number | null;
+  duration_ms: number | null;
+  ip: string | null;
+  user_agent: string | null;
+}
+
+export interface AuditPage {
+  items: AuditEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AuditFacets {
+  entity_types: string[];
+  actions: string[];
+}
+

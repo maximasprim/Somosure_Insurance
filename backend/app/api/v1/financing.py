@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.deps import get_optional_customer_id
 from app.core.security import get_current_claims, require_roles
 from app.models.financing import FinancingAgreement, FinancingApplication, FinancingInstallment
 from app.schemas.financing import (
@@ -20,6 +21,8 @@ from app.schemas.financing import (
     FinancingTransitionRequest,
     InstallmentOut,
 )
+from app.schemas.documents import DocumentChecklistOut
+from app.services.document_reuse_service import financing_checklist
 from app.services.financing_service import (
     check_eligibility,
     get_financing_application_detail,
@@ -43,6 +46,7 @@ async def eligibility(payload: EligibilityRequest, db: AsyncSession = Depends(ge
         payload.term_months,
         payload.has_existing_logbook_loan,
         payload.logbook_loan_age_months,
+        payload.is_corporate,
     )
 
 
@@ -68,6 +72,28 @@ async def upload_document(
     a financing application - open to the customer, matching the same
     no-auth-required document upload on the insurance application flow."""
     return await upload_financing_document(db, application_id, document_type, file)
+
+
+@router.get("/applications/{application_id}/documents/checklist", response_model=DocumentChecklistOut)
+async def documents_checklist(application_id: str, db: AsyncSession = Depends(get_db)):
+    """Which Bidii Credit documents are already on file and which are still
+    needed - read-only."""
+    return await financing_checklist(db, application_id, attach=False)
+
+
+@router.post("/applications/{application_id}/documents/prepare", response_model=DocumentChecklistOut)
+async def prepare_documents(
+    application_id: str,
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
+):
+    """Attaches everything the customer has already given us (the documents
+    from the insurance application for this same quote - and, for a
+    logged-in customer, their identity documents from earlier applications),
+    generates the premium quote document, and returns only what is still
+    missing - so nobody is asked for the same document twice. Safe to call
+    repeatedly."""
+    return await financing_checklist(db, application_id, attach=True, authed_customer_id=authed_customer_id)
 
 
 @router.get("/applications/{application_id}/status", response_model=FinancingApplicationOut)

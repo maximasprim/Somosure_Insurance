@@ -18,6 +18,12 @@ little time but avoids an entire class of flaky failures.
 
 import os
 
+# The existing tests upload placeholder bytes as "documents"; real upload
+# screening (app/services/document_validation.py) would - correctly -
+# refuse those, so it is switched off for the suite. The screening itself is
+# covered by tests/test_document_validation.py, which calls it directly.
+os.environ.setdefault("DOCUMENT_VALIDATION", "off")
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -70,10 +76,14 @@ async def client(session_factory):
             yield session
 
     app.dependency_overrides[get_db] = override_get_db
+    # The audit middleware writes its request rows through its own session;
+    # point it at the test database like the request sessions are.
+    app.state.audit_session_factory = session_factory
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+    app.state.audit_session_factory = None
 
 
 @pytest.fixture

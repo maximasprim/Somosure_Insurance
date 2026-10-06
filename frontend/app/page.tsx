@@ -26,13 +26,15 @@ import { ProductWheel } from "@/components/ProductWheel";
 const INSURE_OPTIONS = [
   { category: "motor", name: "Motor", href: "/quote/motor", desc: "Comprehensive or third-party cover for your vehicle." },
   { category: "medical", name: "Health", href: "/quote/medical", desc: "Individual or family medical cover." },
-  { category: "home", name: "Home", href: "/quote/home", desc: "Cover for your house or apartment." },
-  { category: "business", name: "Business", href: "/quote/business", desc: "Property, liability, or combined business cover." },
+  { category: "property", name: "Property", href: "/quote/property", desc: "Fire, theft and burglary, and more - for your home, rental or business premises." },
   { category: "travel", name: "Travel", href: "/quote/travel", desc: "Cover for medical emergencies, luggage, and cancellations." },
   { category: "life", name: "Life", href: "/quote/life", desc: "Term cover that protects your dependents." },
   { category: "personal_accident", name: "Personal accident", href: "/quote/personal_accident", desc: "A lump-sum payout if an accident affects your ability to work." },
   { category: "professional_indemnity", name: "Professional indemnity", href: "/quote/professional_indemnity", desc: "Cover against claims of negligence or error in your professional service." },
   { category: "wiba", name: "WIBA", href: "/quote/wiba", desc: "Statutory cover for your employees against workplace injury." },
+  { category: "cargo", name: "Cargo", href: "/quote/cargo", desc: "Local and marine cover for goods in transit.", comingSoon: true },
+  { category: "hull", name: "Hull", href: "/quote/hull", desc: "Cover for boats, vessels and their machinery.", comingSoon: true },
+  { category: "cybersecurity", name: "Cybersecurity", href: "/quote/cybersecurity", desc: "Protection against data breaches and ransomware.", comingSoon: true },
 ];
 
 const TRUST_ROW = [

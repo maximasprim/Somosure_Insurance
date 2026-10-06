@@ -7,7 +7,7 @@ import { MessageCircle } from "lucide-react";
 // number once the WhatsApp integration (docs/WHATSAPP.md) is live with a
 // real WABA. wa.me links work regardless of the Cloud API integration
 // status, so this is safe to ship even before real credentials exist.
-const WHATSAPP_NUMBER = "254700000000";
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "254700000000";
 
 export function WhatsAppButton() {
   return (

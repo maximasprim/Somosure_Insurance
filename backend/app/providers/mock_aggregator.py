@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
+from app.services.product_catalog import demo_base_premium, demo_coverage_summary
 from app.providers.base import (
     ApplicationResult,
     ClaimStatusResult,
@@ -23,9 +24,8 @@ _BASE_RATES: dict[str, Decimal] = {
     "medical": Decimal("35000"),
     "personal_accident": Decimal("6000"),
     "travel": Decimal("4000"),
-    "home": Decimal("12000"),
+    "property": Decimal("12000"),
     "life": Decimal("20000"),
-    "business": Decimal("50000"),
     "professional_indemnity": Decimal("28000"),
     "wiba": Decimal("15000"),
 }
@@ -52,8 +52,11 @@ class MockAggregatorProvider(InsuranceProviderAdapter):
             for insurer in _DEMO_UNDERLYING_INSURERS
         ]
 
-    def _quote_for(self, product_category: str, underlying_name: str) -> NormalizedQuote:
-        base = _BASE_RATES.get(product_category, Decimal("10000"))
+    def _quote_for(
+        self, product_category: str, underlying_name: str, answers: dict[str, Any] | None = None
+    ) -> NormalizedQuote:
+        answers = answers or {}
+        base = demo_base_premium(product_category, answers, _BASE_RATES.get(product_category, Decimal("10000")))
         index = _DEMO_UNDERLYING_INSURERS.index(underlying_name)
         hash_component = int(hashlib.sha256(f"{self.provider_id}-{underlying_name}".encode()).hexdigest(), 16) % 15
         variance = index * 20 + hash_component  # index spacing (20) exceeds hash range (0-14) so ranges never overlap
@@ -69,7 +72,12 @@ class MockAggregatorProvider(InsuranceProviderAdapter):
             taxes=taxes,
             fees=fees,
             total=total,
-            coverage={"summary": f"Standard {product_category} cover underwritten by {underlying_name}"},
+            coverage={
+                "summary": demo_coverage_summary(
+                    product_category, answers, f"Standard {product_category} cover underwritten by {underlying_name}"
+                )
+                + (f" - underwritten by {underlying_name}" if product_category == "property" else "")
+            },
             exclusions={"items": ["Wear and tear", "Pre-existing conditions"]},
             deductibles={"excess": "10% of claim, min KES 5,000"},
             payment_options={"methods": ["mpesa", "card"], "installments_allowed": True},
@@ -86,7 +94,7 @@ class MockAggregatorProvider(InsuranceProviderAdapter):
         return self._quote_for(product_category, _DEMO_UNDERLYING_INSURERS[0])
 
     async def get_quotes_bulk(self, product_category: str, answers: dict[str, Any]) -> list[NormalizedQuote]:
-        return [self._quote_for(product_category, name) for name in _DEMO_UNDERLYING_INSURERS]
+        return [self._quote_for(product_category, name, answers) for name in _DEMO_UNDERLYING_INSURERS]
 
     async def create_application(self, quote_ref: str, applicant: dict[str, Any]) -> ApplicationResult:
         return ApplicationResult(provider_reference=f"MOCK-AGG-APP-{uuid.uuid4().hex[:8].upper()}", status="received")

@@ -20,3 +20,9 @@ python-dateutil==2.9.0.post0
 slowapi==0.1.9
 sentry-sdk[fastapi]==2.14.0
 aiosmtplib==3.0.2
+# Upload screening (app/services/document_validation.py). Both are optional
+# at runtime - the checks they power are skipped cleanly if missing - but
+# install them for the full set of document checks.
+pypdf>=5.0,<6
+Pillow>=10.4,<13
+pytesseract>=0.3.10,<0.4

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { AuditTimeline } from "@/components/AuditTimeline";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { api } from "@/lib/api";
@@ -166,6 +167,10 @@ export default function AdminCustomerDetailPage() {
           ))}
           {customer.communications.length === 0 && <p className="text-sm text-ink-soft">No communications logged yet.</p>}
         </div>
+      </section>
+
+      <section className="mt-10">
+        <AuditTimeline customerId={customer.id} title="Audit trail for this customer" />
       </section>
     </main>
   );

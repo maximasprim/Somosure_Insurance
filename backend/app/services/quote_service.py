@@ -7,6 +7,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.phone import phone_variants
 from app.models.crm import Lead, LeadActivity
 from app.models.customer import Customer
 from app.models.provider import InsuranceProvider
@@ -43,7 +44,10 @@ async def resolve_customer(db: AsyncSession, customer_id: str | None, answers: d
     if not phone:
         return None
 
-    guest = await db.scalar(select(Customer).where(Customer.phone == phone))
+    # Match every common spelling of the same number (0712..., +254712...,
+    # 254712...) so one person typing their number differently doesn't
+    # become several customers. Stored numbers are never rewritten.
+    guest = await db.scalar(select(Customer).where(Customer.phone.in_(phone_variants(phone))).order_by(Customer.created_at.asc()))
     if guest:
         return guest
 

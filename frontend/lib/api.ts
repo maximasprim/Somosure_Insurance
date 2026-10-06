@@ -29,16 +29,45 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+// Optional second/third argument: why this change is being made. It is sent
+// as a header and stored on the audit trail next to who/what/when.
+export interface AuditOptions {
+  reason?: string;
+}
+
+function auditHeaders(opts?: AuditOptions): Record<string, string> {
+  const reason = opts?.reason?.trim();
+  return reason ? { "X-Audit-Reason": encodeURIComponent(reason) } : {};
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
-  patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
-  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  post: <T>(path: string, body?: unknown, opts?: AuditOptions) =>
+    request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined, headers: auditHeaders(opts) }),
+  put: <T>(path: string, body?: unknown, opts?: AuditOptions) =>
+    request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined, headers: auditHeaders(opts) }),
+  patch: <T>(path: string, body?: unknown, opts?: AuditOptions) =>
+    request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined, headers: auditHeaders(opts) }),
+  del: <T>(path: string, opts?: AuditOptions) => request<T>(path, { method: "DELETE", headers: auditHeaders(opts) }),
 };
+
+// Downloads a file the API protects with the login token (a plain link can't
+// send the token), e.g. the audit-trail CSV export.
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, { headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `Download failed: ${res.status}`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function storeSession(accessToken: string, refreshToken: string) {
   window.localStorage.setItem("somosure_access_token", accessToken);
@@ -100,3 +129,30 @@ export function hasValidSession(): boolean {
   if (!window.localStorage.getItem("somosure_access_token")) return false;
   return !isTokenExpired();
 }
+
+// Multipart file upload with proper error messages. The generic `api`
+// helpers above always send JSON, so file uploads (which must NOT set a
+// JSON Content-Type - the browser adds the multipart boundary itself) get
+// their own helper. Surfaces the server's own reason when an upload is
+// refused (e.g. "This doesn't look like a National ID...") instead of a
+// vague "Upload failed".
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", body: form, headers: { ...authHeaders() } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body?.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : res.status === 413
+        ? "That file is too large - the limit is 10MB."
+        : res.status === 415
+        ? "Only PDF, JPEG or PNG files are accepted."
+        : "Upload failed - please try again.";
+    throw new Error(message);
+  }
+  return res.json();
+}
+

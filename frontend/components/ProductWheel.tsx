@@ -7,9 +7,11 @@ import {
     Car,
     HeartPulse,
     Umbrella,
-    Home,
+    Building2,
     Plane,
-    Briefcase,
+    Truck,
+    Ship,
+    LockKeyhole,
     UserCheck,
     Scale,
     HardHat,
@@ -24,18 +26,22 @@ export interface WheelItem {
     name: string;
     href: string;
     desc: string;
+    // Announced but not quotable yet - shown with a "Coming soon" tag.
+    comingSoon?: boolean;
 }
 
 const ICONS: Record<string, LucideIcon> = {
     motor: Car,
     medical: HeartPulse,
     life: Umbrella,
-    home: Home,
+    property: Building2,
     travel: Plane,
-    business: Briefcase,
     personal_accident: UserCheck,
     professional_indemnity: Scale,
     wiba: HardHat,
+    cargo: Truck,
+    hull: Ship,
+    cybersecurity: LockKeyhole,
 };
 
 const AUTOPLAY_MS = 3200;
@@ -164,9 +170,14 @@ export function ProductWheel({ items, compact = false }: { items: WheelItem[]; c
                         className="flex flex-1 flex-col items-center gap-2 text-center"
                     >
                         <h3 className={compact ? "font-display text-sm font-bold" : "font-display text-lg font-bold"}>{activeItem.name}</h3>
+                        {activeItem.comingSoon && (
+                            <span className="rounded-full bg-brand-tint px-2.5 py-0.5 text-xs font-semibold text-ink">Coming soon</span>
+                        )}
                         {!compact && <p className="max-w-sm text-sm text-ink-soft">{activeItem.desc}</p>}
                         <Link href={activeItem.href} className="mt-1">
-                            <Button className="w-full rounded-full">Get a quote</Button>
+                            <Button className="w-full rounded-full" variant={activeItem.comingSoon ? "ghost" : "primary"}>
+                                {activeItem.comingSoon ? "Talk to an agent" : "Get a quote"}
+                            </Button>
                         </Link>
                     </motion.div>
                 </AnimatePresence>

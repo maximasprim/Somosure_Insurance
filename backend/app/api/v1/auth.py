@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.context import bind_actor, note, record_event
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.rate_limit import limiter
@@ -90,14 +91,27 @@ async def login(request: Request, payload: LoginRequest, db: AsyncSession = Depe
     # actual brute-force target (spec §30).
     user = await db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.hashed_password):
+        # The email tried is kept on the audit row (never the password) so
+        # repeated guessing against one account is visible to management.
+        note(login_email=payload.email, outcome="bad_credentials", known_account=bool(user))
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect email or password")
     if not user.is_active:
+        note(login_email=payload.email, outcome="account_disabled")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
 
     role_row = await db.scalar(
         select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user.id)
     )
     role_name = role_row or "customer"
+
+    bind_actor(user.id, role_name, user.full_name, user.email)
+    record_event(
+        "auth.login",
+        entity_type="users",
+        entity_id=user.id,
+        entity_label=user.email,
+        summary=f"{user.full_name} signed in ({role_name})",
+    )
 
     return TokenResponse(
         access_token=create_access_token(str(user.id), role_name),

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { api } from "@/lib/api";
 import type { ExtraBenefitCatalogItem } from "@/lib/types";
+import { OTHER_OPTION, makesGrouped, modelsFor } from "@/lib/vehicleData";
 
 // Kept intentionally short for the initial quote - the platform should ask
 // only what's needed to price the risk, not everything up front (spec §53:
@@ -62,8 +63,37 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    setValue,
+    formState: { errors, isSubmitted },
   } = useForm<MotorQuoteFormValues>({ resolver: zodResolver(motorQuoteSchema), defaultValues: { usage: "private" } });
+
+  // Make -> Model dropdowns. The form still stores plain strings in
+  // `make` and `model` (exactly what the backend already receives); these
+  // local choices just drive which dropdown/typing box produced them. Every
+  // list has an "Other" escape hatch so a make or model that isn't in our
+  // list can always be typed in.
+  const [makeChoice, setMakeChoice] = useState("");
+  const [makeOther, setMakeOther] = useState("");
+  const [modelChoice, setModelChoice] = useState("");
+  const [modelOther, setModelOther] = useState("");
+  const { popular: popularMakes, others: otherMakes } = makesGrouped();
+  const modelOptions = makeChoice && makeChoice !== OTHER_OPTION ? modelsFor(makeChoice) : [];
+
+  function pickMake(choice: string, typed = makeOther) {
+    setMakeChoice(choice);
+    setMakeOther(typed);
+    // A different make invalidates whatever model was chosen for the old one.
+    setModelChoice("");
+    setModelOther("");
+    setValue("model", "", { shouldValidate: isSubmitted });
+    setValue("make", choice === OTHER_OPTION ? typed : choice, { shouldValidate: isSubmitted });
+  }
+
+  function pickModel(choice: string, typed = modelOther) {
+    setModelChoice(choice);
+    setModelOther(typed);
+    setValue("model", choice === OTHER_OPTION ? typed : choice, { shouldValidate: isSubmitted });
+  }
 
   const usage = useWatch({ control, name: "usage" });
   const value = useWatch({ control, name: "value" });
@@ -88,10 +118,87 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
     coverType === "comprehensive" && ((vehicleAge !== null && vehicleAge > 15) || (value && Number(value) < 500000));
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-5 sm:grid-cols-2">
+    <form
+      onSubmit={handleSubmit((v) => onSubmit({ ...v, registration_number: v.registration_number.trim().toUpperCase() }))}
+      className="grid gap-5 sm:grid-cols-2"
+    >
       <Input label="Registration number" placeholder="KDA 123X" {...register("registration_number")} error={errors.registration_number?.message} />
-      <Input label="Make" placeholder="Toyota" {...register("make")} error={errors.make?.message} />
-      <Input label="Model" placeholder="Axio" {...register("model")} error={errors.model?.message} />
+
+      <input type="hidden" {...register("make")} />
+      <input type="hidden" {...register("model")} />
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="make-select" className="text-sm font-medium text-ink">Make</label>
+        <select
+          id="make-select"
+          value={makeChoice}
+          onChange={(e) => pickMake(e.target.value)}
+          className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm"
+        >
+          <option value="">Select make…</option>
+          <optgroup label="Popular">
+            {popularMakes.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </optgroup>
+          <optgroup label="All other makes">
+            {otherMakes.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </optgroup>
+          <option value={OTHER_OPTION}>Other (not listed)</option>
+        </select>
+        {makeChoice === OTHER_OPTION && (
+          <input
+            type="text"
+            autoFocus
+            placeholder="Type the vehicle make"
+            value={makeOther}
+            onChange={(e) => pickMake(OTHER_OPTION, e.target.value)}
+            className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm"
+          />
+        )}
+        {errors.make?.message && <p className="text-xs text-status-error">Select or type the vehicle make</p>}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="model-select" className="text-sm font-medium text-ink">Model</label>
+        {makeChoice === OTHER_OPTION || (makeChoice !== "" && modelOptions.length === 0) ? (
+          <input
+            id="model-select"
+            type="text"
+            placeholder="Type the vehicle model"
+            value={modelOther}
+            onChange={(e) => pickModel(OTHER_OPTION, e.target.value)}
+            className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm"
+          />
+        ) : (
+          <select
+            id="model-select"
+            value={modelChoice}
+            disabled={!makeChoice}
+            onChange={(e) => pickModel(e.target.value)}
+            className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm disabled:bg-neutral/50"
+          >
+            <option value="">{makeChoice ? "Select model…" : "Select a make first"}</option>
+            {modelOptions.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+            {makeChoice && <option value={OTHER_OPTION}>Other (not listed)</option>}
+          </select>
+        )}
+        {makeChoice !== OTHER_OPTION && modelChoice === OTHER_OPTION && (
+          <input
+            type="text"
+            autoFocus
+            placeholder="Type the vehicle model"
+            value={modelOther}
+            onChange={(e) => pickModel(OTHER_OPTION, e.target.value)}
+            className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm"
+          />
+        )}
+        {errors.model?.message && <p className="text-xs text-status-error">Select or type the vehicle model</p>}
+      </div>
       <Input label="Year" type="number" {...register("year")} error={errors.year?.message} />
       <Input label="Estimated value (KES)" type="number" {...register("value")} error={errors.value?.message} />
 

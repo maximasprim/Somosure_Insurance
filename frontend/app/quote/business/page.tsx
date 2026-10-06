@@ -1,6 +1,7 @@
-import { GenericQuoteFlow } from "@/components/quote/GenericQuoteFlow";
-import { CATEGORY_CONFIGS } from "@/lib/quoteFields";
+import { redirect } from "next/navigation";
 
-export default function BusinessQuotePage() {
-  return <GenericQuoteFlow config={CATEGORY_CONFIGS["business"]} />;
+// Home and business insurance are now one product: property insurance.
+// This keeps old links, bookmarks and shared URLs working.
+export default function LegacyQuotePage() {
+  redirect("/quote/property");
 }

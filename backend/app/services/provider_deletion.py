@@ -34,11 +34,12 @@ rather than deleted outright.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.context import record_event
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.claim import Claim, ClaimDocument, ClaimEvent
 from app.models.financing import (
@@ -184,4 +185,13 @@ async def force_delete_provider(db: AsyncSession, provider_id: str) -> DeletionC
         await db.delete(provider)
 
     await db.commit()
+    # The bulk deletes above bypass the ORM, so they aren't individually
+    # captured - record exactly what was removed as one audit event.
+    record_event(
+        "provider.deleted_with_dependents",
+        entity_type="insurance_providers",
+        entity_id=provider_id,
+        summary="Deleted an insurance provider and everything depending on it",
+        removed=asdict(counts),
+    )
     return counts

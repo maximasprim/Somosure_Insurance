@@ -15,6 +15,7 @@ just migrations.
 from app.models import (  # noqa: F401
     application,
     asset,
+    audit,
     automation,
     claim,
     content,

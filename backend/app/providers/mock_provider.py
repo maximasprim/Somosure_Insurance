@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
+from app.services.product_catalog import demo_base_premium, demo_coverage_summary
 from app.providers.base import (
     ApplicationResult,
     ClaimStatusResult,
@@ -21,9 +22,8 @@ _BASE_RATES: dict[str, Decimal] = {
     "medical": Decimal("35000"),
     "personal_accident": Decimal("6000"),
     "travel": Decimal("4000"),
-    "home": Decimal("12000"),
+    "property": Decimal("12000"),
     "life": Decimal("20000"),
-    "business": Decimal("50000"),
     "professional_indemnity": Decimal("28000"),
     "wiba": Decimal("15000"),
 }
@@ -44,7 +44,7 @@ class MockProvider(InsuranceProviderAdapter):
         return [{"category": cat, "name": f"{self.display_name} {cat.title()} Cover"} for cat in _BASE_RATES]
 
     async def get_quote(self, product_category: str, answers: dict[str, Any]) -> NormalizedQuote:
-        base = _BASE_RATES.get(product_category, Decimal("10000"))
+        base = demo_base_premium(product_category, answers, _BASE_RATES.get(product_category, Decimal("10000")))
         # Deterministic variance per provider so multiple mock providers in a
         # comparison table don't all show identical numbers.
         variance = int(hashlib.sha256(self.provider_id.encode()).hexdigest(), 16) % 20
@@ -60,7 +60,7 @@ class MockProvider(InsuranceProviderAdapter):
             taxes=taxes,
             fees=fees,
             total=total,
-            coverage={"summary": f"Standard {product_category} cover"},
+            coverage={"summary": demo_coverage_summary(product_category, answers, f"Standard {product_category} cover")},
             exclusions={"items": ["Wear and tear", "Pre-existing conditions"]},
             deductibles={"excess": "10% of claim, min KES 5,000"},
             payment_options={"methods": ["mpesa", "card", "bank_transfer"], "installments_allowed": True},

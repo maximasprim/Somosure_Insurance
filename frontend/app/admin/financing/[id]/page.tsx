@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { AuditTimeline } from "@/components/AuditTimeline";
 import { Card } from "@/components/ui/Card";
 import { api, getTokenRole } from "@/lib/api";
 import type { FinancingApplicationDetail } from "@/lib/types";
@@ -282,6 +283,11 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-ink">{formatLabel(type)}</span>
                       <Badge tone={doc ? "success" : "error"}>{doc ? "Uploaded" : "Missing"}</Badge>
+                      {doc?.validation_notes && (
+                        <span className={`text-xs ${doc.status === "needs_review" ? "text-amber-700" : "text-ink-soft"}`}>
+                          {doc.validation_notes}
+                        </span>
+                      )}
                     </div>
                     {doc && (
                       <Button variant="ghost" onClick={() => viewDocument(doc.id)}>
@@ -384,6 +390,8 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
               {application.events.length === 0 && <p className="text-sm text-ink-soft">No activity yet.</p>}
             </div>
           </Card>
+
+          <AuditTimeline entityType="financing_applications" entityId={application.id} />
         </div>
       </div>
     </main>

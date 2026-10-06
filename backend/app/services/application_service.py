@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storage
+from app.services.document_intake import screen_upload
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.asset import InsuredAsset, Vehicle
 from app.models.customer import Customer
@@ -87,6 +88,13 @@ async def upload_document(
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "File exceeds the 10MB limit")
 
+    # Screen the file before it is stored (see document_intake.py) - raises
+    # a 422 with a customer-friendly reason in strict mode.
+    existing_docs = (
+        await db.scalars(select(ApplicationDocument).where(ApplicationDocument.application_id == application.id))
+    ).all()
+    outcome = await screen_upload(document_type, file.filename or "document", content, existing_docs)
+
     storage = get_storage()
     storage_path = await storage.save(f"applications/{application_id}", file.filename or "document", content)
 
@@ -97,7 +105,9 @@ async def upload_document(
         original_filename=file.filename or "document",
         content_type=file.content_type,
         size_bytes=len(content),
-        status="uploaded",
+        status=outcome.status,
+        validation_notes=outcome.notes,
+        file_hash=outcome.file_hash,
     )
     db.add(doc)
 

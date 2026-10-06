@@ -80,8 +80,7 @@ class RateCardAdapter(InsuranceProviderAdapter):
             coverage["assumptions"] = breakdown.assumptions
         if breakdown.data_confidence != "verified":
             coverage["data_confidence_notice"] = (
-                "This rate is transcribed from a source document that did not parse cleanly and has not yet "
-                "been verified against the original rate card - confirm before binding a real policy."
+                "This rate needs to be verified against the original rate card - confirm before binding a real policy."
             )
 
         payment_options: dict[str, Any] = {"methods": ["mpesa", "card", "bank_transfer"], "installments_allowed": True}

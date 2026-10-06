@@ -11,6 +11,7 @@ class EligibilityRequest(BaseModel):
     term_months: int = 6
     has_existing_logbook_loan: bool = False
     logbook_loan_age_months: int | None = None
+    is_corporate: bool = False
     # Waives the deposit, applies the preferred interest rate, and waives
     # the three fees below - but only when has_existing_logbook_loan is
     # True AND logbook_loan_age_months is within the configured window
@@ -27,6 +28,7 @@ class EligibilityOut(BaseModel):
     financed_amount: Decimal
     interest_rate_monthly: Decimal
     concession_applied: bool
+    corporate_terms_applied: bool
     loan_application_fee: Decimal | None
     life_insurance_fee: Decimal | None
     excise_duty_amount: Decimal | None
@@ -34,6 +36,15 @@ class EligibilityOut(BaseModel):
     term_months: int
     monthly_installment: Decimal | None
     is_mock: bool
+        # Additive, optional context so the UI can explain itself and build its
+    # controls from the live admin-configured settings instead of
+    # hardcoding them (see check_eligibility in financing_service.py).
+    concession_loan_age_max_months: int | None = None
+    min_term_months: int | None = None
+    max_term_months: int | None = None
+    standard_deposit_percentage: Decimal | None = None
+    standard_interest_rate_monthly: Decimal | None = None
+    preferred_interest_rate_monthly: Decimal | None = None
 
 
 class FinancingApplicationCreate(BaseModel):
@@ -101,6 +112,7 @@ class FinancingDocumentOut(BaseModel):
     original_filename: str
     status: str
     uploaded_at: datetime
+    validation_notes: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -194,6 +206,8 @@ class FinancingSettingsOut(BaseModel):
     life_insurance_fee_pct: Decimal
     excise_duty_pct: Decimal
     concession_loan_age_max_months: int
+    corporate_deposit_percentage: Decimal | None = None
+    corporate_interest_rate_monthly: Decimal | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -213,3 +227,6 @@ class FinancingSettingsUpdate(BaseModel):
     life_insurance_fee_pct: Decimal | None = None
     excise_duty_pct: Decimal | None = None
     concession_loan_age_max_months: int | None = None
+    # Send null to clear back to "same as standard".
+    corporate_deposit_percentage: Decimal | None = None
+    corporate_interest_rate_monthly: Decimal | None = None

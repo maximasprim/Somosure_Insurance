@@ -54,6 +54,33 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str = "somosure-dev-verify-token"
     whatsapp_app_secret: str = ""
 
+    # Upload screening for application/financing documents (see
+    # app/services/document_validation.py).
+    #   strict  - junk (wrong file type, blank/corrupt file, a PDF that
+    #             clearly isn't the claimed document) is refused with a
+    #             clear message. Recommended for production.
+    #   lenient - nothing is refused; suspicious files are stored flagged
+    #             "needs_review" with the reason, for staff to see.
+    #   off     - no screening at all (original behaviour).
+    document_validation: str = "strict"
+
+    # Audit trail (see docs/AUDIT_TRAIL.md).
+    audit_enabled: bool = True
+    # Extra comma-separated table names to leave out of change capture
+    # (on top of the built-in list in app/audit/capture.py).
+    audit_excluded_tables: str = ""
+    # Also record every admin READ request (very detailed, grows fast).
+    # Document downloads and exports are always recorded regardless.
+    audit_log_reads: bool = False
+    # Record public/guest requests that change data (quote requests, uploads...).
+    audit_log_guest_requests: bool = True
+
+    # Quote categories with no live (non-demo) pricing are shown to
+    # customers as "coming soon" with an agent hand-off. Set true in a
+    # demo/staging environment to let the mock insurers' demo quotes
+    # through for every category instead.
+    allow_demo_quote_categories: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

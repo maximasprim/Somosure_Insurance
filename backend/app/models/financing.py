@@ -156,6 +156,8 @@ class FinancingDocument(Base):
     size_bytes: Mapped[int] = mapped_column()
     status: Mapped[str] = mapped_column(String(20), default="uploaded")
     # uploaded | verified | rejected
+    validation_notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -220,6 +222,12 @@ class FinancingSettings(Base):
     # How recent an existing Bidii Credit logbook loan must be for the
     # deposit/rate/fee concessions to apply at all.
     concession_loan_age_max_months: Mapped[int] = mapped_column(Integer, default=3)
+    
+    # Optional company-applicant terms. NULL = same as the standard terms,
+    # so nothing changes until management sets one. The existing-customer
+    # concession always takes precedence over these.
+    corporate_deposit_percentage: Mapped[Numeric | None] = mapped_column(Numeric(5, 2), nullable=True)
+    corporate_interest_rate_monthly: Mapped[Numeric | None] = mapped_column(Numeric(5, 2), nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)

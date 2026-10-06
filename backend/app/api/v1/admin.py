@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.context import record_event
 from app.core.database import get_db
 from app.core.security import get_current_claims, require_roles
 from app.models.application import Application
@@ -211,4 +212,11 @@ async def transition(
 async def get_application_document_link(application_id: str, document_id: str, db: AsyncSession = Depends(get_db)):
     """A short-lived signed URL so staff can open an uploaded document."""
     url = await get_application_document_url(db, application_id, document_id)
+    record_event(
+        "document.opened",
+        entity_type="applications",
+        entity_id=application_id,
+        summary="Opened an uploaded application document",
+        document_id=document_id,
+    )
     return {"url": url}
