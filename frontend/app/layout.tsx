@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, Public_Sans } from "next/font/google";
 import "./globals.css";
+import { RefCapture } from "@/components/RefCapture";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -33,7 +34,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${manrope.variable} ${publicSans.variable}`}>
-      <body>{children}</body>
+      <body>
+        <RefCapture />
+        {children}
+      </body>
     </html>
   );
 }

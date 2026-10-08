@@ -55,7 +55,7 @@ export default function AdminPaymentsPage() {
   }, [status]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main className="mx-auto max-w-7xl px-3 py-4">
       <h1 className="text-2xl font-bold">Payments</h1>
       <p className="mt-1 text-ink-soft">Every payment intent across the platform.</p>
 

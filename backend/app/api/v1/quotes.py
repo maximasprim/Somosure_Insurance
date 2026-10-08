@@ -26,7 +26,6 @@ async def create_quote_request(payload: QuoteRequestCreate, db: AsyncSession = D
     quote_request, quotes, any_failure = await request_quotes(
         db, category, payload.answers, payload.customer_id
     )
-
     provider_names: dict[str, str] = {}
     if quotes:
         providers = (
@@ -38,7 +37,7 @@ async def create_quote_request(payload: QuoteRequestCreate, db: AsyncSession = D
         ).all()
         provider_names = {str(p.id): p.name for p in providers}
 
-    return QuoteRequestOut(
+    response = QuoteRequestOut(
         reference=quote_request.reference,
         category=quote_request.category,
         status=quote_request.status,
@@ -70,6 +69,19 @@ async def create_quote_request(payload: QuoteRequestCreate, db: AsyncSession = D
             for q in quotes
         ],
     )
+
+    if payload.referral_code and response.customer_id:
+        # Credit whoever sent this visitor. Strictly best-effort and done AFTER
+        # the response is built (a rollback expires loaded objects): a bad or
+        # unusable code must never get in the way of the customer's quote.
+        try:
+            from app.services.referral_service import attribute_referrer
+
+            await attribute_referrer(db, payload.referral_code, response.customer_id, raise_on_self=False)
+        except Exception:
+            await db.rollback()
+
+    return response
 
 
 @router.get("/availability")

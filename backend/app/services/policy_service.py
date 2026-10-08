@@ -1,3 +1,4 @@
+import logging
 from datetime import date, timedelta
 
 from fastapi import HTTPException, status
@@ -78,4 +79,18 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
 
     await mark_converted_if_referred(db, str(policy.customer_id), str(policy.id))
 
+    # Affiliate commission for whoever referred this customer. The policy is
+    # already issued and saved, so nothing here may be allowed to undo or fail
+    # it: any problem is logged and swallowed.
+    try:
+        from app.services.affiliate_service import record_commission_for_policy
+
+        await record_commission_for_policy(db, str(policy.id))
+    except Exception:
+        logging.getLogger("somosure.affiliate").exception("Could not record affiliate commission for policy %s", policy.id)
+        await db.rollback()
+
+    # A rollback (above, or inside the commission code on a rare race) expires
+    # loaded objects; reload the policy so the caller can still use it.
+    await db.refresh(policy)
     return policy

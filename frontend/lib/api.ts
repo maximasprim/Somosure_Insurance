@@ -11,6 +11,15 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Fired after any successful change (POST/PUT/PATCH/DELETE/upload) so parts of
+// a screen that show derived data - like the audit trail panel - can refresh
+// themselves instead of waiting for a page reload.
+export const DATA_CHANGED_EVENT = "somosure:data-changed";
+
+function notifyDataChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -25,6 +34,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const detail = await res.json().catch(() => ({}));
     throw new Error(detail.detail ?? `Request failed: ${res.status}`);
   }
+  if ((options.method ?? "GET").toUpperCase() !== "GET") notifyDataChanged();
   if (res.status === 204) return undefined as T;
   return res.json();
 }
@@ -153,6 +163,6 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
         : "Upload failed - please try again.";
     throw new Error(message);
   }
+  notifyDataChanged();
   return res.json();
 }
-

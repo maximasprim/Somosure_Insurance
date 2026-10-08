@@ -11,6 +11,7 @@ import { PaymentStep } from "@/components/quote/PaymentStep";
 import { DocumentChecklistCard } from "@/components/quote/DocumentChecklistCard";
 import { ApprovalWaitStep } from "@/components/quote/ApprovalWaitStep";
 import { ResumeQuoteCard } from "@/components/quote/ResumeQuoteCard";
+import { getStoredReferral } from "@/lib/referral";
 import { clearQuoteSession, loadQuoteSession, saveQuoteSession, type SavedQuoteSession } from "@/lib/quoteSession";
 import { api, isLoggedIn } from "@/lib/api";
 import type { ApplicationResult, CustomerProfile, NormalizedQuote, QuoteRequestResult } from "@/lib/types";
@@ -80,6 +81,7 @@ export default function MotorQuotePage() {
       const res = await api.post<QuoteRequestResult>("/api/v1/quotes", {
         category: "motor",
         answers: values,
+        referral_code: getStoredReferral(),
       });
       setResult(res);
       // The backend resolves (or creates) a real guest Customer from the

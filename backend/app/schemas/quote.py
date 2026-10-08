@@ -8,6 +8,8 @@ class QuoteRequestCreate(BaseModel):
     category: str = Field(examples=["motor", "medical", "travel", "property", "life", "personal_accident", "professional_indemnity", "wiba"])
     answers: dict = Field(default_factory=dict, description="Smart-form answers, shape depends on category")
     customer_id: str | None = None
+    # Code from a referral/affiliate link the visitor arrived through (optional).
+    referral_code: str | None = None
 
 
 class NormalizedQuoteOut(BaseModel):

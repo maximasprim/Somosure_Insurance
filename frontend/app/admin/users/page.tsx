@@ -102,7 +102,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Staff & access</h1>
       <p className="mt-1 text-ink-soft">
         Invite staff accounts and control who has which role. This is the only place roles can be changed - there's

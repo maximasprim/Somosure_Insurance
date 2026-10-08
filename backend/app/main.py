@@ -8,7 +8,8 @@ from slowapi.errors import RateLimitExceeded
 import app.models  # noqa: F401 - guarantees every model is registered on
 # Base.metadata regardless of which routes happen to import which model
 # classes directly (see app/models/__init__.py for why this matters).
-from app.api.v1 import admin, admin_audit, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
+from app.api.v1 import admin, admin_affiliates, admin_audit, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
+from app.api.v1 import affiliate_me
 from app.audit.capture import install as install_audit_capture
 from app.audit.middleware import AuditMiddleware
 from app.core.config import get_settings
@@ -52,8 +53,10 @@ app.include_router(auth.router)
 app.include_router(quotes.router)
 app.include_router(applications.router)
 app.include_router(policies.router)
-app.include_router(admin_audit.router)
 app.include_router(admin.router)
+app.include_router(admin_audit.router)
+app.include_router(admin_affiliates.router)
+app.include_router(affiliate_me.router)
 app.include_router(admin_users.router)
 app.include_router(admin_users.roles_router)
 app.include_router(admin_customers.router)

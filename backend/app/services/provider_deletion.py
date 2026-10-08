@@ -40,6 +40,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.context import record_event
+from app.models.affiliate import AffiliateCommission
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.claim import Claim, ClaimDocument, ClaimEvent
 from app.models.financing import (
@@ -73,6 +74,7 @@ class DeletionCounts:
     financing_applications: int = 0
     financing_agreements: int = 0
     referrals_unlinked: int = 0
+    affiliate_commissions_unlinked: int = 0
     policies: int = 0
     applications: int = 0
     quotes: int = 0
@@ -142,6 +144,13 @@ async def force_delete_provider(db: AsyncSession, provider_id: str) -> DeletionC
     # reward/relationship it represents outlives any one policy).
     result = await db.execute(update(Referral).where(Referral.policy_id.in_(policy_ids)).values(policy_id=None))
     counts.referrals_unlinked = result.rowcount or 0
+
+    # Commissions are financial records (money earned or paid) - kept, with
+    # only the link to the removed policy cleared.
+    result = await db.execute(
+        update(AffiliateCommission).where(AffiliateCommission.policy_id.in_(policy_ids)).values(policy_id=None)
+    )
+    counts.affiliate_commissions_unlinked = result.rowcount or 0
 
     # 7. Policies
     await db.execute(delete(PolicyDocument).where(PolicyDocument.policy_id.in_(policy_ids)))

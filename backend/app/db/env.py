@@ -12,8 +12,10 @@ from sqlalchemy import pool
 from app.core.config import get_settings
 from app.core.database import Base
 from app.models import (  # noqa: F401 - registers models on Base.metadata
+    affiliate,
     application,
     asset,
+    audit,
     automation,
     claim,
     content,

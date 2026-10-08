@@ -28,6 +28,9 @@ class Referral(Base):
     # Set once the referred customer's first policy is issued - this is
     # what "conversion" means for this referral.
 
+    referred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the code was actually used (created_at is when the code was made).
+
     status: Mapped[str] = mapped_column(String(20), default="pending")
     reward_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     reward_paid: Mapped[bool] = mapped_column(default=False)

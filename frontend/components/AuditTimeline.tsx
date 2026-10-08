@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AuditChanges } from "@/components/AuditChanges";
 import { Card } from "@/components/ui/Card";
-import { api } from "@/lib/api";
+import { api, DATA_CHANGED_EVENT } from "@/lib/api";
 import type { AuditPage } from "@/lib/types";
 
 /**
@@ -29,6 +29,23 @@ export function AuditTimeline({
   const [page, setPage] = useState<AuditPage | null>(null);
   const [denied, setDenied] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Refresh whenever anything on the screen is changed (approve, reject,
+  // upload, edit...). A short pause lets the server finish recording the
+  // change before we ask for it.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onChanged = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setRefreshTick((n) => n + 1), 400);
+    };
+    window.addEventListener(DATA_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener(DATA_CHANGED_EVENT, onChanged);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +60,7 @@ export function AuditTimeline({
     return () => {
       cancelled = true;
     };
-  }, [entityType, entityId, customerId]);
+  }, [entityType, entityId, customerId, refreshTick]);
 
   if (denied || !page) return null;
 

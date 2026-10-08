@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import { ReferralCard } from "@/components/ReferralCard";
+import { AffiliateCard } from "@/components/AffiliateCard";
 import type { AppNotification, DashboardData } from "@/lib/types";
 
 function formatKES(amount: string) {
@@ -126,6 +127,7 @@ export default function DashboardPage() {
       )}
 
       <ReferralCard />
+      <AffiliateCard />
     </main>
   );
 }

@@ -550,3 +550,119 @@ export interface AuditFacets {
   actions: string[];
 }
 
+// --- Affiliate program ---
+
+export interface AffiliateSettings {
+  program_enabled: boolean;
+  default_rate_type: "percent" | "fixed";
+  default_rate_value: string;
+  min_premium: string | null;
+  max_commission_per_policy: string | null;
+  scope: "first_policy" | "all_policies";
+  window_months: number;
+  auto_approve: boolean;
+  allow_self_enrollment: boolean;
+  updated_at: string;
+}
+
+export interface AffiliateRateRule {
+  id: string;
+  name: string;
+  rate_type: "percent" | "fixed";
+  rate_value: string;
+  max_amount: string | null;
+  affiliate_customer_id: string | null;
+  affiliate_name: string | null;
+  category: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface AffiliatePartner {
+  id: string;
+  customer_id: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  code: string;
+  status: "active" | "suspended";
+  payout_method: string;
+  payout_phone: string | null;
+  notes: string | null;
+  referred: number;
+  converted: number;
+  earned_pending: string;
+  earned_approved: string;
+  earned_paid: string;
+  created_at: string;
+}
+
+export type CommissionStatus = "pending" | "approved" | "paid" | "reversed" | "rejected";
+
+export interface AffiliateCommissionRow {
+  id: string;
+  referrer_customer_id: string;
+  referrer_name: string | null;
+  referrer_phone: string | null;
+  payout_phone: string | null;
+  referred_name: string | null;
+  policy_id: string | null;
+  policy_number: string | null;
+  category: string | null;
+  premium: string;
+  rate_type: string;
+  rate_value: string;
+  rate_label: string | null;
+  commission_amount: string;
+  status: CommissionStatus;
+  status_note: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  payout_method: string | null;
+  payout_reference: string | null;
+  created_at: string;
+}
+
+export interface AffiliateCommissionPage {
+  items: AffiliateCommissionRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AffiliateSummary {
+  pending_count: number;
+  pending_amount: string;
+  approved_count: number;
+  approved_amount: string;
+  paid_count: number;
+  paid_amount: string;
+  affiliates: number;
+  referred: number;
+  converted: number;
+}
+
+export interface MyAffiliate {
+  program_enabled: boolean;
+  can_self_enroll: boolean;
+  is_affiliate: boolean;
+  affiliate_code: string | null;
+  affiliate_status: string | null;
+  payout_phone: string | null;
+  referred: number;
+  converted: number;
+  earned_pending: string;
+  earned_approved: string;
+  earned_paid: string;
+  commissions: {
+    id: string;
+    category: string | null;
+    referred_first_name: string | null;
+    commission_amount: string;
+    status: CommissionStatus;
+    created_at: string;
+    paid_at: string | null;
+  }[];
+}
+

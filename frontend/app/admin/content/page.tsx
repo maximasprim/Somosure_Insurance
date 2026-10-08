@@ -144,7 +144,7 @@ export default function AdminContentPage() {
   }
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Content & FAQs</h1>
       <p className="mt-1 text-ink-soft">Manage the educational articles and FAQ entries shown publicly on the site.</p>
 

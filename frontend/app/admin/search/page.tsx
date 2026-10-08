@@ -49,7 +49,7 @@ export default function AdminSearchPage() {
   const totalResults = results ? Object.values(results).reduce((sum, arr) => sum + arr.length, 0) : 0;
 
   return (
-    <main className="mx-auto max-w-8xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Search</h1>
       <p className="mt-1 text-ink-soft">Find a customer, quote, application, policy, claim, or payment by reference.</p>
 

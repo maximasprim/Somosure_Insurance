@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { AuthTopbar } from "@/components/AuthTopbar";
 import { api, storeSession } from "@/lib/api";
+import { getStoredReferral } from "@/lib/referral";
 
 interface TokenResponse {
   access_token: string;
@@ -18,6 +19,12 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ full_name: "", email: "", phone: "", password: "", referral_code: "" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Someone who arrived through a referral link doesn't have to type the code.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("ref") || getStoredReferral();
+    if (code) setForm((f) => (f.referral_code ? f : { ...f, referral_code: code.toUpperCase() }));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

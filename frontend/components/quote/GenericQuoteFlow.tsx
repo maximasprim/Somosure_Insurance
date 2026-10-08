@@ -13,6 +13,7 @@ import { ApprovalWaitStep } from "@/components/quote/ApprovalWaitStep";
 import { ComingSoonCard, useCategoryAvailability } from "@/components/quote/ComingSoonCard";
 import type { QuoteAnswers } from "@/components/quote/DynamicQuoteForm";
 import { ResumeQuoteCard } from "@/components/quote/ResumeQuoteCard";
+import { getStoredReferral } from "@/lib/referral";
 import { clearQuoteSession, loadQuoteSession, saveQuoteSession, type SavedQuoteSession } from "@/lib/quoteSession";
 import { api, isLoggedIn } from "@/lib/api";
 import type { CategoryConfig } from "@/lib/quoteFields";
@@ -79,7 +80,11 @@ export function GenericQuoteFlow({ config }: { config: CategoryConfig }) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.post<QuoteRequestResult>("/api/v1/quotes", { category: config.category, answers: values });
+      const res = await api.post<QuoteRequestResult>("/api/v1/quotes", {
+        category: config.category,
+        answers: values,
+        referral_code: getStoredReferral(),
+      });
       setResult(res);
       if (res.customer_id) setCustomerId(res.customer_id);
       setStep("compare");
