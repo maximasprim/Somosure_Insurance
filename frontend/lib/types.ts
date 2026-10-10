@@ -556,6 +556,13 @@ export interface AffiliateSettings {
   program_enabled: boolean;
   default_rate_type: "percent" | "fixed";
   default_rate_value: string;
+  existing_customer_rate_type: "percent" | "fixed" | null;
+  existing_customer_rate_value: string | null;
+  existing_customer_reward: "commission" | "discount" | "both";
+  discount_type: "percent" | "fixed";
+  discount_value: string;
+  discount_max_amount: string | null;
+  discount_valid_days: number;
   min_premium: string | null;
   max_commission_per_policy: string | null;
   scope: "first_policy" | "all_policies";
@@ -574,6 +581,7 @@ export interface AffiliateRateRule {
   affiliate_customer_id: string | null;
   affiliate_name: string | null;
   category: string | null;
+  referrer_segment: "existing_customer" | "not_a_customer" | null;
   starts_on: string | null;
   ends_on: string | null;
   active: boolean;
@@ -664,5 +672,54 @@ export interface MyAffiliate {
     created_at: string;
     paid_at: string | null;
   }[];
+  discounts: {
+    id: string;
+    description: string;
+    status: "available" | "applied" | "expired" | "cancelled";
+    expires_at: string | null;
+    applied_amount: string | null;
+    note: string | null;
+  }[];
+}
+
+export type DiscountStatus = "available" | "applied" | "expired" | "cancelled";
+
+export interface DiscountCredit {
+  id: string;
+  customer_id: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  source: "referral" | "manual";
+  description: string;
+  discount_type: "percent" | "fixed";
+  discount_value: string;
+  max_amount: string | null;
+  expires_at: string | null;
+  status: DiscountStatus;
+  note: string | null;
+  status_note: string | null;
+  applied_application_id: string | null;
+  applied_application_reference: string | null;
+  applied_amount: string | null;
+  applied_at: string | null;
+  created_at: string;
+}
+
+export interface DiscountPage {
+  items: DiscountCredit[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EligibleApplication {
+  application_id: string;
+  reference: string;
+  status: string;
+  premium: string;
+  total: string;
+  max_discount: string;
+  eligible: boolean;
+  blocked_reason: string | null;
 }
 

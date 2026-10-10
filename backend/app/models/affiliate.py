@@ -30,6 +30,22 @@ class AffiliateSettings(Base):
     default_rate_type: Mapped[str] = mapped_column(String(10), default="percent")
     default_rate_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
 
+    # Optional different rate when the referrer is an existing customer (has a
+    # policy with us that is currently active). NULL = they earn the default rate.
+    existing_customer_rate_type: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    existing_customer_rate_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+
+    # What an existing customer (someone with an active policy) gets for a
+    # referral: "commission" (cash, the default), "discount" (a discount credit
+    # on their own insurance INSTEAD of commission) or "both".
+    existing_customer_reward: Mapped[str] = mapped_column(String(12), default="commission")
+    # The discount credit granted for each rewarded referral...
+    discount_type: Mapped[str] = mapped_column(String(10), default="percent")
+    discount_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
+    discount_max_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    # ...and how long it stays usable.
+    discount_valid_days: Mapped[int] = mapped_column(Integer, default=365)
+
     # Policies with a smaller premium than this earn nothing. NULL = no minimum.
     min_premium: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     # Most one policy can ever earn, whatever the rate. NULL = no cap.
@@ -85,6 +101,9 @@ class AffiliateRateRule(Base):
         UUID(as_uuid=True), ForeignKey("customers.id"), nullable=True
     )
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # None = any referrer; "existing_customer" = only referrers who already have
+    # an active policy with us; "not_a_customer" = only referrers who don't.
+    referrer_segment: Mapped[str | None] = mapped_column(String(20), nullable=True)
     starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -127,3 +146,45 @@ class AffiliateCommission(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+DISCOUNT_STATUSES = ("available", "applied", "expired", "cancelled")
+
+
+class ReferralDiscount(Base):
+    """A discount credit owed to an existing customer for referring someone who
+    bought insurance (or granted by staff). It does nothing by itself: STAFF
+    choose, case by case, which of the customer's applications it is applied to,
+    and the discount is then taken off what they pay.
+
+    Deliberately no foreign keys to policies/applications, so removing those
+    (e.g. deleting a provider) never gets blocked by, or silently erases, a
+    customer's credit."""
+
+    __tablename__ = "referral_discounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), index=True)
+    referral_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("referrals.id"), nullable=True)
+    source: Mapped[str] = mapped_column(String(10), default="referral")  # referral | manual
+    # The referred customer's policy that earned it - at most one credit per policy.
+    source_policy_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, unique=True)
+
+    discount_type: Mapped[str] = mapped_column(String(10), default="percent")
+    discount_value: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    max_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    status: Mapped[str] = mapped_column(String(12), default="available", index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)  # why it exists
+    status_note: Mapped[str | None] = mapped_column(Text, nullable=True)  # why it was applied / cancelled / released
+
+    applied_application_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    applied_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    applied_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

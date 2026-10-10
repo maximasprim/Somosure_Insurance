@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_current_customer
-from app.models.affiliate import Affiliate, AffiliateCommission
+from app.models.affiliate import Affiliate, AffiliateCommission, ReferralDiscount
 from app.models.customer import Customer
-from app.schemas.affiliate import MyAffiliateOut, MyAffiliateUpdate, MyCommissionOut
+from app.schemas.affiliate import MyAffiliateOut, MyAffiliateUpdate, MyCommissionOut, MyDiscountOut
 from app.services import affiliate_service as svc
+from app.services import referral_discount_service as dsvc
 
 router = APIRouter(prefix="/api/v1/me/affiliate", tags=["affiliate"])
 
@@ -42,6 +43,19 @@ async def _overview(db: AsyncSession, customer: Customer) -> MyAffiliateOut:
             )
         )
 
+    credits = (
+        await db.scalars(
+            select(ReferralDiscount).where(ReferralDiscount.customer_id == customer.id).order_by(ReferralDiscount.created_at.desc()).limit(20)
+        )
+    ).all()
+    discounts = [
+        MyDiscountOut(
+            id=c.id, description=dsvc.describe(c), status=dsvc.effective_status(c), expires_at=c.expires_at,
+            applied_amount=c.applied_amount, note=c.note,
+        )
+        for c in credits
+    ]
+
     return MyAffiliateOut(
         program_enabled=settings.program_enabled,
         can_self_enroll=bool(settings.program_enabled and settings.allow_self_enrollment and not affiliate),
@@ -55,6 +69,7 @@ async def _overview(db: AsyncSession, customer: Customer) -> MyAffiliateOut:
         earned_approved=earned.get("approved", Decimal("0")),
         earned_paid=earned.get("paid", Decimal("0")),
         commissions=commissions,
+        discounts=discounts,
     )
 
 

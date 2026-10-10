@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,7 @@ from app.models.affiliate import (
     AffiliateCommission,
     AffiliateRateRule,
     AffiliateSettings,
+    ReferralDiscount,
 )
 from app.models.application import Application
 from app.models.customer import Customer
@@ -68,6 +69,10 @@ async def get_affiliate_settings(db: AsyncSession) -> AffiliateSettings:
             window_months=12,
             auto_approve=False,
             allow_self_enrollment=False,
+            existing_customer_reward="commission",
+            discount_type="percent",
+            discount_value=Decimal("0.00"),
+            discount_valid_days=365,
         )
         db.add(row)
         await db.commit()
@@ -78,9 +83,23 @@ async def get_affiliate_settings(db: AsyncSession) -> AffiliateSettings:
 # --------------------------------------------------------------- rate lookup
 
 
+async def is_existing_customer(db: AsyncSession, customer_id: Any) -> bool:
+    """An 'existing customer' has at least one policy with us that is in force
+    right now (active, and not past its end date)."""
+    if not customer_id:
+        return False
+    found = await db.scalar(
+        select(Policy.id)
+        .where(Policy.customer_id == customer_id, Policy.status == "active", Policy.end_date >= date.today())
+        .limit(1)
+    )
+    return found is not None
+
+
 async def resolve_rate(db: AsyncSession, referrer_customer_id: Any, category: str | None, settings: AffiliateSettings | None = None) -> RateChoice:
     settings = settings or await get_affiliate_settings(db)
     rules = (await db.scalars(select(AffiliateRateRule))).all()
+    existing_value = settings.existing_customer_rate_value
     return pick_rate(
         rules,
         referrer_id=str(referrer_customer_id) if referrer_customer_id else None,
@@ -88,6 +107,9 @@ async def resolve_rate(db: AsyncSession, referrer_customer_id: Any, category: st
         today=date.today(),
         default_type=settings.default_rate_type,
         default_value=Decimal(settings.default_rate_value),
+        referrer_is_customer=await is_existing_customer(db, referrer_customer_id),
+        existing_customer_type=settings.existing_customer_rate_type,
+        existing_customer_value=Decimal(existing_value) if existing_value is not None else None,
     )
 
 
@@ -104,6 +126,7 @@ async def preview_commission(db: AsyncSession, referrer_customer_id: Any, catego
         "rate_label": choice.label,
         "amount": str(Decimal("0.00") if below_min else amount),
         "below_minimum_premium": below_min,
+        "referrer_is_existing_customer": await is_existing_customer(db, referrer_customer_id),
     }
 
 
@@ -139,6 +162,47 @@ async def _sync_referral(db: AsyncSession, referral: Referral) -> None:
         referral.status = "converted"
 
 
+async def eligible_referral(db: AsyncSession, settings: AffiliateSettings, policy: Policy) -> Referral | None:
+    """The referral that should be rewarded for this policy, or None. Shared by
+    commissions and discount credits so both follow the same rules: the buyer
+    was referred, not by themselves, the referrer isn't a paused affiliate, and
+    the program's scope (first policy only, or every policy within the window)
+    allows it."""
+    referral = await db.scalar(
+        select(Referral).where(Referral.referred_customer_id == policy.customer_id).order_by(Referral.created_at.asc()).limit(1)
+    )
+    if not referral or str(referral.referrer_customer_id) == str(policy.customer_id):
+        return None
+
+    affiliate = await db.scalar(select(Affiliate).where(Affiliate.customer_id == referral.referrer_customer_id))
+    if affiliate and affiliate.status == "suspended":
+        return None
+
+    if settings.scope == "first_policy":
+        # Anything already awarded for this referral on a DIFFERENT policy means
+        # the first policy has been and gone. (A removed policy leaves a null link.)
+        other_commissions = await db.scalar(
+            select(func.count()).select_from(AffiliateCommission).where(
+                AffiliateCommission.referral_id == referral.id,
+                or_(AffiliateCommission.policy_id.is_(None), AffiliateCommission.policy_id != policy.id),
+            )
+        )
+        other_credits = await db.scalar(
+            select(func.count()).select_from(ReferralDiscount).where(
+                ReferralDiscount.referral_id == referral.id,
+                or_(ReferralDiscount.source_policy_id.is_(None), ReferralDiscount.source_policy_id != policy.id),
+            )
+        )
+        # (ids compared as text: the link may have just been set from a string)
+        if other_commissions or other_credits or (referral.policy_id is not None and str(referral.policy_id) != str(policy.id)):
+            return None
+    elif settings.window_months:
+        started = referral.referred_at or referral.created_at
+        if _now() > add_months(started, int(settings.window_months)):
+            return None
+    return referral
+
+
 async def record_commission_for_policy(db: AsyncSession, policy_id: Any) -> AffiliateCommission | None:
     """Called when a policy is issued. Creates the referrer's commission if the
     program is on and every rule is met; otherwise does nothing. Safe to call
@@ -153,27 +217,14 @@ async def record_commission_for_policy(db: AsyncSession, policy_id: Any) -> Affi
     if await db.scalar(select(AffiliateCommission.id).where(AffiliateCommission.policy_id == policy.id)):
         return None
 
-    referral = await db.scalar(
-        select(Referral).where(Referral.referred_customer_id == policy.customer_id).order_by(Referral.created_at.asc()).limit(1)
-    )
-    if not referral or str(referral.referrer_customer_id) == str(policy.customer_id):
+    referral = await eligible_referral(db, settings, policy)
+    if not referral:
         return None
 
-    affiliate = await db.scalar(select(Affiliate).where(Affiliate.customer_id == referral.referrer_customer_id))
-    if affiliate and affiliate.status == "suspended":
+    # When existing customers are rewarded with a discount INSTEAD of cash,
+    # they don't also earn commission.
+    if settings.existing_customer_reward == "discount" and await is_existing_customer(db, referral.referrer_customer_id):
         return None
-
-    if settings.scope == "first_policy":
-        already = await db.scalar(
-            select(func.count()).select_from(AffiliateCommission).where(AffiliateCommission.referral_id == referral.id)
-        )
-        # (ids compared as text: the link may have just been set from a string)
-        if already or (referral.policy_id is not None and str(referral.policy_id) != str(policy.id)):
-            return None
-    elif settings.window_months:
-        started = referral.referred_at or referral.created_at
-        if _now() > add_months(started, int(settings.window_months)):
-            return None
 
     premium = Decimal(policy.premium or 0)
     if settings.min_premium is not None and premium < Decimal(settings.min_premium):
@@ -335,3 +386,21 @@ async def referral_counts(db: AsyncSession, referrer_customer_id: Any) -> dict[s
         )
     ).one()
     return {"referred": int(referred or 0), "converted": int(converted or 0)}
+
+
+async def record_rewards_for_policy(db: AsyncSession, policy_id: Any) -> None:
+    """Everything a referrer can earn when the referred customer's policy is
+    issued: cash commission and/or a discount credit, per the program settings.
+    Each part is independent - a problem in one never stops the other."""
+    try:
+        await record_commission_for_policy(db, policy_id)
+    except Exception:
+        logger.exception("Could not record affiliate commission for policy %s", policy_id)
+        await db.rollback()
+    try:
+        from app.services.referral_discount_service import grant_discount_for_policy
+
+        await grant_discount_for_policy(db, policy_id)
+    except Exception:
+        logger.exception("Could not grant a referral discount for policy %s", policy_id)
+        await db.rollback()

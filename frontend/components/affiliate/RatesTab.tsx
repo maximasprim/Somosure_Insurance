@@ -45,6 +45,13 @@ export function RatesTab() {
           program_enabled: settings.program_enabled,
           default_rate_type: settings.default_rate_type,
           default_rate_value: settings.default_rate_value,
+          existing_customer_rate_type: settings.existing_customer_rate_value ? settings.existing_customer_rate_type ?? settings.default_rate_type : null,
+          existing_customer_rate_value: settings.existing_customer_rate_value ? settings.existing_customer_rate_value : null,
+          existing_customer_reward: settings.existing_customer_reward,
+          discount_type: settings.discount_type,
+          discount_value: settings.discount_value || "0",
+          discount_max_amount: settings.discount_max_amount === "" ? null : settings.discount_max_amount,
+          discount_valid_days: Number(settings.discount_valid_days),
           min_premium: settings.min_premium === "" ? null : settings.min_premium,
           max_commission_per_policy: settings.max_commission_per_policy === "" ? null : settings.max_commission_per_policy,
           scope: settings.scope,
@@ -102,6 +109,32 @@ export function RatesTab() {
               <input type="number" step="0.01" min="0" disabled={!canEdit} value={settings.default_rate_value} onChange={(e) => set("default_rate_value", e.target.value)} className={`${inputClass} max-w-[8rem]`} />
             </div>
           </Field>
+          <Field
+            label="Rate when the referrer is an existing customer (optional)"
+            hint="Used when the person referring already has a policy with us that is currently active (not cancelled or expired). Leave blank to pay them the default rate."
+          >
+            <div className="flex gap-2">
+              <select
+                disabled={!canEdit}
+                value={settings.existing_customer_rate_type ?? settings.default_rate_type}
+                onChange={(e) => set("existing_customer_rate_type", e.target.value as "percent" | "fixed")}
+                className={`${inputClass} max-w-[10rem]`}
+              >
+                <option value="percent">% of premium</option>
+                <option value="fixed">KES per policy</option>
+              </select>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={!canEdit}
+                placeholder="same as default"
+                value={settings.existing_customer_rate_value ?? ""}
+                onChange={(e) => set("existing_customer_rate_value", e.target.value === "" ? null : e.target.value)}
+                className={`${inputClass} max-w-[9rem]`}
+              />
+            </div>
+          </Field>
           <Field label="Which policies earn commission">
             <select disabled={!canEdit} value={settings.scope} onChange={(e) => set("scope", e.target.value as AffiliateSettings["scope"])} className={inputClass}>
               <option value="first_policy">Only the referred customer&apos;s first policy</option>
@@ -121,6 +154,49 @@ export function RatesTab() {
           <Field label="Most one policy can earn (optional)" hint="A ceiling that applies on top of any rate. Leave blank for no cap.">
             <input type="number" min="0" step="0.01" disabled={!canEdit} value={settings.max_commission_per_policy ?? ""} onChange={(e) => set("max_commission_per_policy", e.target.value === "" ? null : e.target.value)} className={inputClass} />
           </Field>
+        </div>
+
+        <div className="flex flex-col gap-4 rounded-control bg-neutral/60 p-4">
+          <Field
+            label="When an existing customer refers someone who buys insurance, reward them with"
+            hint="An existing customer is someone with a policy that is currently active. People who aren't customers always earn commission."
+          >
+            <select
+              disabled={!canEdit}
+              value={settings.existing_customer_reward}
+              onChange={(e) => set("existing_customer_reward", e.target.value as AffiliateSettings["existing_customer_reward"])}
+              className={inputClass}
+            >
+              <option value="commission">Commission (cash)</option>
+              <option value="discount">A discount on their own insurance - instead of commission</option>
+              <option value="both">Both commission and a discount</option>
+            </select>
+          </Field>
+          {settings.existing_customer_reward !== "commission" && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Discount" hint="Taken off the premium (before taxes and fees) of the policy staff apply it to.">
+                  <div className="flex gap-2">
+                    <select disabled={!canEdit} value={settings.discount_type} onChange={(e) => set("discount_type", e.target.value as "percent" | "fixed")} className={`${inputClass} max-w-[9rem]`}>
+                      <option value="percent">% off</option>
+                      <option value="fixed">KES off</option>
+                    </select>
+                    <input type="number" min="0" step="0.01" disabled={!canEdit} value={settings.discount_value} onChange={(e) => set("discount_value", e.target.value)} className={`${inputClass} max-w-[7rem]`} />
+                  </div>
+                </Field>
+                <Field label="Most it can take off (optional)">
+                  <input type="number" min="0" step="0.01" disabled={!canEdit} value={settings.discount_max_amount ?? ""} onChange={(e) => set("discount_max_amount", e.target.value === "" ? null : e.target.value)} className={inputClass} />
+                </Field>
+                <Field label="Usable for (days)" hint="After this the credit expires.">
+                  <input type="number" min="1" max="3650" disabled={!canEdit} value={settings.discount_valid_days} onChange={(e) => set("discount_valid_days", Number(e.target.value))} className={inputClass} />
+                </Field>
+              </div>
+              <p className="text-xs text-ink-soft">
+                A credit does nothing until staff apply it to one of that customer&apos;s applications (Discounts tab), so you decide case by case.
+                It can be used on pay-in-full or payment-plan purchases, not on premiums paid through Bidii Credit financing.
+              </p>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 text-sm">
@@ -153,7 +229,7 @@ export function RatesTab() {
 }
 
 function RulesSection({ rules, canEdit, onChanged }: { rules: AffiliateRateRule[]; canEdit: boolean; onChanged: () => void }) {
-  const empty = { name: "", rate_type: "percent", rate_value: "", max_amount: "", category: "", starts_on: "", ends_on: "" };
+  const empty = { name: "", rate_type: "percent", rate_value: "", max_amount: "", category: "", segment: "", starts_on: "", ends_on: "" };
   const [form, setForm] = useState(empty);
   const [person, setPerson] = useState<PickedCustomer | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +247,7 @@ function RulesSection({ rules, canEdit, onChanged }: { rules: AffiliateRateRule[
           rate_value: form.rate_value,
           max_amount: form.max_amount || null,
           category: form.category || null,
+          referrer_segment: form.segment || null,
           affiliate_customer_id: person?.id ?? null,
           starts_on: form.starts_on || null,
           ends_on: form.ends_on || null,
@@ -211,9 +288,10 @@ function RulesSection({ rules, canEdit, onChanged }: { rules: AffiliateRateRule[
       <div>
         <h2 className="text-lg font-semibold">Special rates</h2>
         <p className="text-sm text-ink-soft">
-          Give a particular person, a product, or a time-limited promotion its own rate. The most specific rate wins:
-          that person + product, then that person, then that product, then a rate for everyone, then the default.
-          If two are equally specific, the newest wins.
+          Give a particular person, a product, a kind of referrer (existing customers or not), or a time-limited promotion its
+          own rate. The most specific rate wins: that person + product, then that person, then a product + kind of referrer,
+          then a product, then a kind of referrer, then a rate for everyone - and finally the program rates above. If two are
+          equally specific, the newest wins.
         </p>
       </div>
       {error && <p className="rounded-control bg-status-error/10 px-4 py-2 text-sm text-status-error">{error}</p>}
@@ -227,7 +305,10 @@ function RulesSection({ rules, canEdit, onChanged }: { rules: AffiliateRateRule[
             {rules.map((r) => (
               <tr key={r.id} className="border-t border-neutral-border align-top">
                 <td className="py-2 pr-3 font-medium text-ink">{r.name} {!r.active && <Badge tone="neutral">off</Badge>}</td>
-                <td className="py-2 pr-3 text-ink-soft">{r.affiliate_name ?? "Everyone"}</td>
+                <td className="py-2 pr-3 text-ink-soft">
+                  {r.affiliate_name ?? (r.referrer_segment === "existing_customer" ? "Existing customers" : r.referrer_segment === "not_a_customer" ? "Referrers who aren't customers" : "Everyone")}
+                  {r.affiliate_name && r.referrer_segment && <p className="text-xs">{r.referrer_segment === "existing_customer" ? "if an existing customer" : "if not a customer"}</p>}
+                </td>
                 <td className="py-2 pr-3 text-ink-soft">{categoryLabel(r.category)}</td>
                 <td className="py-2 pr-3">{rateText(r.rate_type, r.rate_value)}{r.max_amount && <p className="text-xs text-ink-soft">up to {kes(r.max_amount)}</p>}</td>
                 <td className="py-2 pr-3 text-xs text-ink-soft">{r.starts_on || r.ends_on ? `${r.starts_on ?? "…"} → ${r.ends_on ?? "…"}` : "Always"}</td>
@@ -258,6 +339,13 @@ function RulesSection({ rules, canEdit, onChanged }: { rules: AffiliateRateRule[
                 {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </Field>
+            <Field label="Referrer is" hint="An existing customer has a policy with us that is currently active.">
+              <select value={form.segment} onChange={(e) => setForm({ ...form, segment: e.target.value })} className={inputClass}>
+                <option value="">Anyone</option>
+                <option value="existing_customer">An existing customer</option>
+                <option value="not_a_customer">Not yet a customer</option>
+              </select>
+            </Field>
             <Field label="Rate">
               <div className="flex gap-2">
                 <select value={form.rate_type} onChange={(e) => setForm({ ...form, rate_type: e.target.value })} className={`${inputClass} max-w-[9rem]`}>
@@ -284,7 +372,7 @@ function PreviewSection() {
   const [person, setPerson] = useState<PickedCustomer | null>(null);
   const [category, setCategory] = useState("");
   const [premium, setPremium] = useState("20000");
-  const [result, setResult] = useState<{ rate_label: string; rate_type: string; rate_value: string; amount: string; below_minimum_premium: boolean; program_enabled: boolean } | null>(null);
+  const [result, setResult] = useState<{ rate_label: string; rate_type: string; rate_value: string; amount: string; below_minimum_premium: boolean; program_enabled: boolean; referrer_is_existing_customer: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function check() {
@@ -322,6 +410,7 @@ function PreviewSection() {
         <div className="rounded-control bg-neutral px-4 py-3 text-sm">
           <p><span className="font-semibold">{person?.full_name}</span> would earn <span className="text-lg font-bold">{kes(result.amount)}</span></p>
           <p className="text-ink-soft">Using “{result.rate_label}” - {rateText(result.rate_type, result.rate_value)}</p>
+          <p className="text-ink-soft">{person?.full_name} {result.referrer_is_existing_customer ? "is an existing customer (has an active policy)." : "is not an existing customer (no active policy)."}</p>
           {result.below_minimum_premium && <p className="text-status-error">Below the minimum premium, so nothing would be earned.</p>}
           {!result.program_enabled && <p className="text-status-error">The program is currently OFF, so nothing is being earned yet.</p>}
         </div>

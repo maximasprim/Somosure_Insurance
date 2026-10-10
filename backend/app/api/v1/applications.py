@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.core.deps import get_optional_customer_id
 from app.models.application import Application
 from app.schemas.application import ApplicationCreate, ApplicationDocumentOut, ApplicationOut
+from app.schemas.affiliate import ApplicationDiscountOut
 from app.schemas.documents import ApplicationStatusOut, DocumentChecklistOut
 from app.services.application_service import create_application, submit_application, upload_document
 from app.services.document_reuse_service import application_checklist
@@ -68,3 +69,14 @@ async def prepare_documents(
     is still needed. A guest simply gets the checklist - nothing is reused
     for someone who isn't logged in. Safe to call repeatedly."""
     return await application_checklist(db, application_id, attach=True, authed_customer_id=authed_customer_id)
+
+
+@router.get("/{application_id}/discount", response_model=ApplicationDiscountOut)
+async def get_discount(application_id: str, db: AsyncSession = Depends(get_db)):
+    """The referral discount staff applied to this application, if any - so the
+    payment screen can show the amount that will actually be charged. Open like
+    the status endpoint: the application's id is the only key."""
+    from app.services.referral_discount_service import application_discount
+
+    return await application_discount(db, application_id)
+

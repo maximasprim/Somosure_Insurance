@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -12,6 +12,15 @@ import type { FinancingApplicationResult, PaymentInitiateResult, PaymentPlanOpti
 
 function formatKES(amount: string | number) {
   return `KES ${Number(amount).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
+}
+
+// What is charged now once a referral discount (applied by staff) is taken off.
+// Mirrors the server, which does the real calculation: paying in full takes it
+// off the total; a payment plan takes it off the FIRST payment, which never
+// drops below KES 1.
+export function dueAfterDiscount(due: number, discount: number, isInstallmentPlan: boolean): number {
+  if (!(discount > 0)) return due;
+  return isInstallmentPlan ? due - Math.min(discount, Math.max(due - 1, 0)) : Math.max(due - discount, 1);
 }
 
 export function PaymentStep({
@@ -41,6 +50,16 @@ export function PaymentStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A referral discount staff may have applied to this application. When there
+  // is none (the normal case) nothing below changes.
+  const [discount, setDiscount] = useState(0);
+  useEffect(() => {
+    api
+      .get<{ discount_amount: string | null }>(`/api/v1/applications/${applicationId}/discount`)
+      .then((res) => setDiscount(Number(res.discount_amount ?? 0)))
+      .catch(() => undefined);
+  }, [applicationId]);
+
   // A plan other than "pay in full" and financing (Bidii Credit) are two
   // different ways of spreading the same premium out - offering both at
   // once would double-count what's owed, so picking one hides the other.
@@ -64,7 +83,13 @@ export function PaymentStep({
   // - the remainder is a separate Bidii Credit installment schedule, never
   // altering the insurance premium itself (spec §14). If Bidii Credit
   // rejected it, the full premium is still due here as normal.
-  const amountDue = financingApproved && financing ? financing.deposit_amount : selectedOption?.due_now ?? amount;
+  const dueNowFor = (opt: PaymentPlanOption) => dueAfterDiscount(Number(opt.due_now), discount, opt.type !== "full");
+  const amountDue =
+    financingApproved && financing
+      ? financing.deposit_amount
+      : String(
+          dueAfterDiscount(Number(selectedOption?.due_now ?? amount), discount, !!selectedOption && selectedOption.type !== "full")
+        );
 
   async function handleInitiate() {
     setBusy(true);
@@ -146,6 +171,13 @@ export function PaymentStep({
         </p>
       </div>
 
+      {discount > 0 && !payment && (
+        <div className="rounded-control bg-status-success/10 px-4 py-3 text-sm text-status-success">
+          A referral discount of <span className="font-semibold">{formatKES(discount)}</span> has been applied to this policy - thank you for referring
+          a friend.
+        </div>
+      )}
+
       {!payment && !financing && hasChoice && !financeMode && (
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-ink">How would you like to pay?</p>
@@ -169,7 +201,7 @@ export function PaymentStep({
                   {opt.label}
                 </span>
                 <span className="text-xs text-ink-soft">
-                  {formatKES(opt.due_now)} due now
+                  {formatKES(dueNowFor(opt))} due now
                   {opt.schedule.length > 1 ? `, then ${opt.schedule.length - 1} more payment(s)` : ""}
                   {opt.sticker_months_per_payment ? ` - each payment covers ${opt.sticker_months_per_payment} month(s) of sticker` : ""}
                 </span>
@@ -179,7 +211,7 @@ export function PaymentStep({
         </div>
       )}
 
-      {!payment && !financing && (
+      {!payment && !financing && discount === 0 && (
         <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} onExpandedChange={setFinanceMode} />
       )}
 

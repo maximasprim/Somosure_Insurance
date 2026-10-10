@@ -229,6 +229,122 @@ async def test_auto_approve_skips_the_review_step(db_session, seeded_providers):
     assert commission.status == "approved" and commission.approved_at is not None
 
 
+# ------------------------------------------------- existing-customer rates
+
+
+async def test_an_existing_customer_who_refers_earns_the_existing_customer_rate(db_session, seeded_providers):
+    from app.services.affiliate_service import record_commission_for_policy
+
+    await _enable(db_session, existing_customer_rate_type="percent", existing_customer_rate_value=Decimal("8.00"))
+
+    loyal, loyal_friend, _ = await _pair(db_session)
+    await _policy(db_session, seeded_providers[0], loyal)  # the referrer already has an active policy with us
+    stranger, stranger_friend, _ = await _pair(db_session)  # this referrer has never bought
+
+    loyal_commission = await record_commission_for_policy(db_session, (await _policy(db_session, seeded_providers[0], loyal_friend, premium="20000.00")).id)
+    other_commission = await record_commission_for_policy(db_session, (await _policy(db_session, seeded_providers[0], stranger_friend, premium="20000.00")).id)
+
+    assert loyal_commission.commission_amount == Decimal("1600.00")  # 8% - the existing-customer rate
+    assert loyal_commission.rate_label == "Existing-customer rate"
+    assert other_commission.commission_amount == Decimal("1000.00")  # 5% - the default
+
+
+async def test_leaving_the_existing_customer_rate_blank_changes_nothing(db_session, seeded_providers):
+    from app.services.affiliate_service import record_commission_for_policy
+
+    await _enable(db_session)  # no existing-customer rate set
+    loyal, friend, _ = await _pair(db_session)
+    await _policy(db_session, seeded_providers[0], loyal)
+    commission = await record_commission_for_policy(db_session, (await _policy(db_session, seeded_providers[0], friend, premium="20000.00")).id)
+    assert commission.commission_amount == Decimal("1000.00") and commission.rate_label == "Default rate"
+
+
+async def test_only_a_policy_in_force_makes_someone_an_existing_customer(db_session, seeded_providers):
+    from app.services.affiliate_service import is_existing_customer
+
+    n = next(_ids)
+    from app.models.customer import Customer
+
+    lapsed = Customer(full_name="Lapsed Larry", phone=f"0719{n:06d}")
+    cancelled = Customer(full_name="Cancelled Cathy", phone=f"0720{n:06d}")
+    never = Customer(full_name="Never Nick", phone=f"0721{n:06d}")
+    db_session.add_all([lapsed, cancelled, never])
+    await db_session.commit()
+
+    old = await _policy(db_session, seeded_providers[0], lapsed)
+    old.end_date = date.today() - timedelta(days=1)
+    gone = await _policy(db_session, seeded_providers[0], cancelled)
+    gone.status = "cancelled"
+    await db_session.commit()
+
+    assert await is_existing_customer(db_session, lapsed.id) is False
+    assert await is_existing_customer(db_session, cancelled.id) is False
+    assert await is_existing_customer(db_session, never.id) is False
+    current, _, _ = await _pair(db_session)
+    await _policy(db_session, seeded_providers[0], current)
+    assert await is_existing_customer(db_session, current.id) is True
+
+
+async def test_a_special_rate_can_be_limited_to_existing_customers_or_to_everyone_else(db_session, seeded_providers):
+    from app.models.affiliate import AffiliateRateRule
+    from app.services.affiliate_service import record_commission_for_policy
+
+    await _enable(db_session, existing_customer_rate_type="percent", existing_customer_rate_value=Decimal("8.00"))
+    db_session.add_all([
+        AffiliateRateRule(name="Loyal medical", rate_type="percent", rate_value=Decimal("12.00"), category="medical", referrer_segment="existing_customer"),
+        AffiliateRateRule(name="Outside referrers", rate_type="percent", rate_value=Decimal("3.00"), referrer_segment="not_a_customer"),
+    ])
+    await db_session.commit()
+
+    loyal, loyal_friend, _ = await _pair(db_session)
+    await _policy(db_session, seeded_providers[0], loyal)
+    stranger, stranger_friend, _ = await _pair(db_session)
+
+    medical = await record_commission_for_policy(db_session, (await _policy(db_session, seeded_providers[0], loyal_friend, premium="10000.00", category="medical")).id)
+    assert medical.commission_amount == Decimal("1200.00")  # product + kind of referrer rule: 12%
+
+    outsider = await record_commission_for_policy(db_session, (await _policy(db_session, seeded_providers[0], stranger_friend, premium="10000.00", category="motor")).id)
+    assert outsider.commission_amount == Decimal("300.00")  # "not a customer" rule: 3%
+
+
+async def test_the_existing_customer_rate_is_configurable_and_clearable_from_the_admin_api(client, db_session):
+    base = "/api/v1/admin/affiliate-program"
+    mgr = {"Authorization": "Bearer " + await _staff_token(client, db_session, "tier@example.com", "management")}
+
+    set_ = await client.patch(f"{base}/settings", json={"existing_customer_rate_type": "percent", "existing_customer_rate_value": "9"}, headers=mgr)
+    assert set_.status_code == 200 and Decimal(set_.json()["existing_customer_rate_value"]) == Decimal("9")
+
+    too_big = await client.patch(f"{base}/settings", json={"existing_customer_rate_type": "percent", "existing_customer_rate_value": "150"}, headers=mgr)
+    assert too_big.status_code == 422
+    assert Decimal((await client.get(f"{base}/settings", headers=mgr)).json()["existing_customer_rate_value"]) == Decimal("9")  # unchanged
+
+    cleared = await client.patch(f"{base}/settings", json={"existing_customer_rate_value": None}, headers=mgr)
+    body = cleared.json()
+    assert body["existing_customer_rate_value"] is None and body["existing_customer_rate_type"] is None
+
+    # a rule limited to existing customers can be created, shown and changed back to "anyone"
+    rule = await client.post(f"{base}/rules", json={"name": "Loyal only", "rate_value": "11", "referrer_segment": "existing_customer"}, headers=mgr)
+    assert rule.status_code == 201 and rule.json()["referrer_segment"] == "existing_customer"
+    anyone = await client.patch(f"{base}/rules/{rule.json()['id']}", json={"referrer_segment": None}, headers=mgr)
+    assert anyone.json()["referrer_segment"] is None
+    assert (await client.post(f"{base}/rules", json={"name": "Bad kind", "rate_value": "1", "referrer_segment": "vip"}, headers=mgr)).status_code == 422
+
+
+async def test_the_preview_says_whether_the_referrer_counts_as_an_existing_customer(client, db_session, seeded_providers):
+    base = "/api/v1/admin/affiliate-program"
+    mgr = {"Authorization": "Bearer " + await _staff_token(client, db_session, "prev2@example.com", "management")}
+    await client.patch(f"{base}/settings", json={"program_enabled": True, "default_rate_value": "5", "existing_customer_rate_type": "percent", "existing_customer_rate_value": "8"}, headers=mgr)
+
+    loyal, _, _ = await _pair(db_session)
+    await _policy(db_session, seeded_providers[0], loyal)
+    stranger, _, _ = await _pair(db_session)
+
+    yes = (await client.get(f"{base}/preview", params={"referrer_customer_id": str(loyal.id), "premium": "10000"}, headers=mgr)).json()
+    no = (await client.get(f"{base}/preview", params={"referrer_customer_id": str(stranger.id), "premium": "10000"}, headers=mgr)).json()
+    assert yes["referrer_is_existing_customer"] is True and yes["rate_label"] == "Existing-customer rate" and Decimal(yes["amount"]) == Decimal("800.00")
+    assert no["referrer_is_existing_customer"] is False and no["rate_label"] == "Default rate" and Decimal(no["amount"]) == Decimal("500.00")
+
+
 # ------------------------------------------------------------------ attribution
 
 

@@ -36,7 +36,7 @@ export function AffiliateCard() {
   }, []);
 
   if (!data) return null;
-  const hasActivity = data.commissions.length > 0 || data.referred > 0;
+  const hasActivity = data.commissions.length > 0 || data.referred > 0 || data.discounts.length > 0;
   if (!data.program_enabled && !hasActivity) return null;
 
   async function enroll() {
@@ -127,6 +127,28 @@ export function AffiliateCard() {
           </div>
         )}
         {error && <p className="text-sm text-status-error">{error}</p>}
+
+        {data.discounts.length > 0 && (
+          <div>
+            <p className="text-sm font-semibold">Your insurance discounts</p>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              A thank-you for referring friends who bought cover. Tell us when you&apos;re buying or renewing and we&apos;ll apply it to your policy.
+            </p>
+            <div className="mt-2 flex flex-col divide-y divide-neutral-border">
+              {data.discounts.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div>
+                    <p className="font-medium text-ink">{d.description}</p>
+                    <p className="text-xs text-ink-soft">
+                      {d.status === "available" && d.expires_at ? `Use it by ${new Date(d.expires_at).toLocaleDateString()}` : d.status === "applied" && d.applied_amount ? `${kes(d.applied_amount)} taken off your policy` : d.note}
+                    </p>
+                  </div>
+                  <Badge tone={d.status === "available" ? "success" : d.status === "applied" ? "brand" : "neutral"}>{d.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {data.commissions.length > 0 && (
           <div>

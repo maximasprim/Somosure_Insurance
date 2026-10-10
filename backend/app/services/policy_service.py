@@ -83,11 +83,11 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
     # already issued and saved, so nothing here may be allowed to undo or fail
     # it: any problem is logged and swallowed.
     try:
-        from app.services.affiliate_service import record_commission_for_policy
+        from app.services.affiliate_service import record_rewards_for_policy
 
-        await record_commission_for_policy(db, str(policy.id))
+        await record_rewards_for_policy(db, str(policy.id))
     except Exception:
-        logging.getLogger("somosure.affiliate").exception("Could not record affiliate commission for policy %s", policy.id)
+        logging.getLogger("somosure.affiliate").exception("Could not record referral rewards for policy %s", policy.id)
         await db.rollback()
 
     # A rollback (above, or inside the commission code on a rare race) expires

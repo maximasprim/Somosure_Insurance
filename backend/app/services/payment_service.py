@@ -2,6 +2,7 @@ import logging
 import random
 import string
 from datetime import date
+from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -14,6 +15,7 @@ from app.models.policy import Policy
 from app.models.quote import Quote
 from app.payments.registry import get_payment_provider
 from app.services import motor_terms
+from app.services.discount_math import apply_discount_to_schedule
 from app.services.policy_service import issue_policy
 
 logger = logging.getLogger("somosure.payment_service")
@@ -73,6 +75,11 @@ async def initiate_payment(
     installment_sequence = None
     charge_amount = amount
 
+    # A referral discount staff applied to this application comes off what is
+    # charged. It is worked out HERE, from the stored quote - never from the
+    # amount the browser sends - and an application without one is untouched.
+    discount = Decimal(application.discount_amount or 0)
+
     if plan_code and plan_code != "full" and installments:
         quote, option = await _resolve_plan_leg(db, application, plan_code, installments)
         schedule = option["schedule"]
@@ -80,6 +87,16 @@ async def initiate_payment(
         installment_sequence = 1
         charge_amount = option["due_now"]
         plan_code = option["plan_code"]
+        if discount > 0:
+            # The discount comes off the first payment (the customer benefits
+            # straight away); the plan's other payments are unchanged.
+            schedule, taken = apply_discount_to_schedule(schedule, discount)
+            total_amount = str(Decimal(str(quote.total)) - taken)
+            charge_amount = schedule[0]["amount"]
+    elif discount > 0:
+        quote = await db.get(Quote, application.quote_id)
+        if quote:
+            charge_amount = str(max(Decimal(str(quote.total)) - discount, Decimal("1.00")))
 
     payment = Payment(
         reference=generate_payment_reference(),

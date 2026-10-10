@@ -6,18 +6,25 @@ tested - on their own.
 How the rate for a referral is chosen
 -------------------------------------
 Admin can set rate RULES. A rule may be tied to one referrer, to one product
-category, to both, or to neither (a "for everyone" rule), and may only apply
-between two dates (a promotion). For one referral the best rule wins:
+category, to a kind of referrer ("an existing customer" or "not yet a
+customer"), or any mix - or to none of them (a "for everyone" rule) - and may
+only apply between two dates (a promotion). For one referral the best rule wins.
+A rule that names the person beats one that names the product, which beats one
+that names the kind of referrer:
 
-    1. this referrer + this category   (most specific)
-    2. this referrer, any category
-    3. any referrer, this category
-    4. any referrer, any category      (a "for everyone" rule)
-    5. the program's default rate      (when no rule applies)
+    this person + product  >  this person  >  product + kind of referrer
+        >  product  >  kind of referrer  >  everyone
+
+If no rule applies, the program's rates are used: the "existing customer"
+rate if the referrer is an existing customer and one is set, otherwise the
+default rate.
 
 Only ACTIVE rules whose dates include today are considered. If two rules are
 equally specific, the one created most recently wins - so adding a new rule
 is always enough to change what happens next.
+
+"Existing customer" = the referrer has at least one policy with us that is
+currently active (not cancelled, not expired).
 """
 
 from dataclasses import dataclass
@@ -37,15 +44,20 @@ class RateChoice:
     label: str
 
 
-def _specificity(rule: Any, referrer_id: Optional[str], category: Optional[str]) -> int:
+def _specificity(rule: Any, referrer_id: Optional[str], category: Optional[str], is_customer: bool) -> int:
     """-1 = rule doesn't apply; otherwise higher = more specific."""
     rule_referrer = str(rule.affiliate_customer_id) if rule.affiliate_customer_id else None
     rule_category = rule.category or None
+    rule_segment = getattr(rule, "referrer_segment", None) or None
     if rule_referrer and rule_referrer != (str(referrer_id) if referrer_id else None):
         return -1
     if rule_category and rule_category != category:
         return -1
-    return (2 if rule_referrer else 0) + (1 if rule_category else 0)
+    if rule_segment == "existing_customer" and not is_customer:
+        return -1
+    if rule_segment == "not_a_customer" and is_customer:
+        return -1
+    return (4 if rule_referrer else 0) + (2 if rule_category else 0) + (1 if rule_segment else 0)
 
 
 def _in_window(rule: Any, today: date) -> bool:
@@ -64,18 +76,25 @@ def pick_rate(
     today: date,
     default_type: str,
     default_value: Decimal,
+    referrer_is_customer: bool = False,
+    existing_customer_type: Optional[str] = None,
+    existing_customer_value: Optional[Decimal] = None,
 ) -> RateChoice:
     best: Optional[tuple[int, datetime, Any]] = None
     for rule in rules:
         if not rule.active or not _in_window(rule, today):
             continue
-        score = _specificity(rule, referrer_id, category)
+        score = _specificity(rule, referrer_id, category, referrer_is_customer)
         if score < 0:
             continue
         created = rule.created_at or datetime.min
         if best is None or (score, created) > (best[0], best[1]):
             best = (score, created, rule)
     if best is None:
+        if referrer_is_customer and existing_customer_value is not None:
+            return RateChoice(
+                existing_customer_type or default_type, Decimal(existing_customer_value), None, None, "Existing-customer rate"
+            )
         return RateChoice(default_type, Decimal(default_value), None, None, "Default rate")
     rule = best[2]
     return RateChoice(

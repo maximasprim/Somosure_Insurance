@@ -10,6 +10,13 @@ class AffiliateSettingsOut(BaseModel):
     program_enabled: bool
     default_rate_type: str
     default_rate_value: Decimal
+    existing_customer_rate_type: str | None = None
+    existing_customer_rate_value: Decimal | None = None
+    existing_customer_reward: str = "commission"
+    discount_type: str = "percent"
+    discount_value: Decimal = Decimal("0")
+    discount_max_amount: Decimal | None = None
+    discount_valid_days: int = 365
     min_premium: Decimal | None
     max_commission_per_policy: Decimal | None
     scope: str
@@ -25,6 +32,14 @@ class AffiliateSettingsUpdate(BaseModel):
     program_enabled: bool | None = None
     default_rate_type: Literal["percent", "fixed"] | None = None
     default_rate_value: Decimal | None = Field(None, ge=0, le=1_000_000)
+    # Send null to clear: existing customers then earn the default rate.
+    existing_customer_rate_type: Literal["percent", "fixed"] | None = None
+    existing_customer_rate_value: Decimal | None = Field(None, ge=0, le=1_000_000)
+    existing_customer_reward: Literal["commission", "discount", "both"] | None = None
+    discount_type: Literal["percent", "fixed"] | None = None
+    discount_value: Decimal | None = Field(None, ge=0, le=10_000_000)
+    discount_max_amount: Decimal | None = Field(None, ge=0)
+    discount_valid_days: int | None = Field(None, ge=1, le=3650)
     min_premium: Decimal | None = Field(None, ge=0)
     max_commission_per_policy: Decimal | None = Field(None, ge=0)
     scope: Literal["first_policy", "all_policies"] | None = None
@@ -40,6 +55,8 @@ class RateRuleIn(BaseModel):
     max_amount: Decimal | None = Field(None, ge=0)
     affiliate_customer_id: uuid.UUID | None = None
     category: str | None = Field(None, max_length=50)
+    # Only referrers who are / aren't existing customers (blank = anyone).
+    referrer_segment: Literal["existing_customer", "not_a_customer"] | None = None
     starts_on: date | None = None
     ends_on: date | None = None
     active: bool = True
@@ -52,6 +69,7 @@ class RateRuleUpdate(BaseModel):
     max_amount: Decimal | None = Field(None, ge=0)
     affiliate_customer_id: uuid.UUID | None = None
     category: str | None = Field(None, max_length=50)
+    referrer_segment: Literal["existing_customer", "not_a_customer"] | None = None
     starts_on: date | None = None
     ends_on: date | None = None
     active: bool | None = None
@@ -66,6 +84,7 @@ class RateRuleOut(BaseModel):
     affiliate_customer_id: uuid.UUID | None
     affiliate_name: str | None = None
     category: str | None
+    referrer_segment: str | None = None
     starts_on: date | None
     ends_on: date | None
     active: bool
@@ -177,6 +196,15 @@ class MyCommissionOut(BaseModel):
     paid_at: datetime | None
 
 
+class MyDiscountOut(BaseModel):
+    id: uuid.UUID
+    description: str
+    status: str
+    expires_at: datetime | None
+    applied_amount: Decimal | None
+    note: str | None
+
+
 class MyAffiliateOut(BaseModel):
     program_enabled: bool
     can_self_enroll: bool
@@ -190,7 +218,71 @@ class MyAffiliateOut(BaseModel):
     earned_approved: Decimal
     earned_paid: Decimal
     commissions: list[MyCommissionOut]
+    discounts: list[MyDiscountOut] = []
 
 
 class MyAffiliateUpdate(BaseModel):
     payout_phone: str = Field(min_length=9, max_length=20)
+
+
+# --------------------------------------------------------- discount credits
+
+
+class DiscountOut(BaseModel):
+    id: uuid.UUID
+    customer_id: uuid.UUID
+    customer_name: str | None = None
+    customer_phone: str | None = None
+    source: str
+    description: str
+    discount_type: str
+    discount_value: Decimal
+    max_amount: Decimal | None
+    expires_at: datetime | None
+    status: str  # available | applied | expired | cancelled
+    note: str | None
+    status_note: str | None
+    applied_application_id: uuid.UUID | None
+    applied_application_reference: str | None = None
+    applied_amount: Decimal | None
+    applied_at: datetime | None
+    created_at: datetime
+
+
+class DiscountPage(BaseModel):
+    items: list[DiscountOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class ManualGrantIn(BaseModel):
+    customer_id: uuid.UUID
+    discount_type: Literal["percent", "fixed"] = "percent"
+    discount_value: Decimal = Field(gt=0, le=10_000_000)
+    max_amount: Decimal | None = Field(None, ge=0)
+    valid_days: int | None = Field(365, ge=1, le=3650)
+    reason: str = Field(min_length=3)
+
+
+class ApplyDiscountIn(BaseModel):
+    application_id: uuid.UUID
+    amount: Decimal | None = Field(None, gt=0)
+    reason: str = Field(min_length=3)
+
+
+class EligibleApplicationOut(BaseModel):
+    application_id: uuid.UUID
+    reference: str
+    status: str
+    premium: Decimal
+    total: Decimal
+    max_discount: Decimal
+    eligible: bool
+    blocked_reason: str | None = None
+
+
+class ApplicationDiscountOut(BaseModel):
+    discount_amount: Decimal | None = None
+    note: str | None = None
+

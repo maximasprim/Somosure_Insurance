@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_claims, require_roles
-from app.models.affiliate import Affiliate, AffiliateCommission, AffiliateRateRule
+from app.models.affiliate import Affiliate, AffiliateCommission, AffiliateRateRule, ReferralDiscount
+from app.models.application import Application
 from app.models.customer import Customer
 from app.models.policy import Policy
 from app.models.referral import Referral
@@ -21,11 +22,16 @@ from app.schemas.affiliate import (
     AffiliateSettingsOut,
     AffiliateSettingsUpdate,
     AffiliateUpdate,
+    ApplyDiscountIn,
     BulkIn,
     BulkResult,
     CommissionOut,
     CommissionPage,
+    DiscountOut,
+    DiscountPage,
+    EligibleApplicationOut,
     EnrollIn,
+    ManualGrantIn,
     PayIn,
     RateRuleIn,
     RateRuleOut,
@@ -34,6 +40,7 @@ from app.schemas.affiliate import (
     SummaryOut,
 )
 from app.services import affiliate_service as svc
+from app.services import referral_discount_service as dsvc
 
 router = APIRouter(prefix="/api/v1/admin/affiliate-program", tags=["admin-affiliates"])
 
@@ -52,12 +59,28 @@ async def get_settings(db: AsyncSession = Depends(get_db)):
 @router.patch("/settings", response_model=AffiliateSettingsOut, dependencies=[Depends(CONFIGURE)])
 async def update_settings(payload: AffiliateSettingsUpdate, db: AsyncSession = Depends(get_db)):
     row = await svc.get_affiliate_settings(db)
-    # Explicit nulls are meaningful for the two optional limits (they clear
-    # them); every other field is only touched when sent.
+    # Explicit nulls are meaningful for the optional limits and the
+    # existing-customer rate (they clear them); every other field is only
+    # touched when sent.
+    clearable = (
+        "min_premium", "max_commission_per_policy", "existing_customer_rate_type", "existing_customer_rate_value",
+        "discount_max_amount",
+    )
     for key, value in payload.model_dump(exclude_unset=True).items():
-        if value is None and key not in ("min_premium", "max_commission_per_policy"):
+        if value is None and key not in clearable:
             continue
         setattr(row, key, value)
+    if row.default_rate_type == "percent" and Decimal(row.default_rate_value) > 100:
+        await db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A percentage rate can't be more than 100.")
+    if row.existing_customer_rate_value is None:
+        row.existing_customer_rate_type = None  # no value -> nothing to pair a type with
+    elif (row.existing_customer_rate_type or row.default_rate_type) == "percent" and Decimal(row.existing_customer_rate_value) > 100:
+        await db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A percentage rate can't be more than 100.")
+    if row.discount_type == "percent" and Decimal(row.discount_value) > 100:
+        await db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A percentage discount can't be more than 100.")
     await db.commit()
     await db.refresh(row)
     return row
@@ -93,7 +116,7 @@ async def _rule_out(db: AsyncSession, rule: AffiliateRateRule) -> RateRuleOut:
     return RateRuleOut(
         id=rule.id, name=rule.name, rate_type=rule.rate_type, rate_value=rule.rate_value, max_amount=rule.max_amount,
         affiliate_customer_id=rule.affiliate_customer_id, affiliate_name=name, category=rule.category,
-        starts_on=rule.starts_on, ends_on=rule.ends_on, active=rule.active, created_at=rule.created_at,
+        referrer_segment=rule.referrer_segment, starts_on=rule.starts_on, ends_on=rule.ends_on, active=rule.active, created_at=rule.created_at,
     )
 
 
@@ -129,7 +152,7 @@ async def update_rule(rule_id: uuid.UUID, payload: RateRuleUpdate, db: AsyncSess
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Rule not found")
     changes = payload.model_dump(exclude_unset=True)
     # null clears these (e.g. "no end date", "applies to everyone")
-    nullable = {"max_amount", "affiliate_customer_id", "category", "starts_on", "ends_on"}
+    nullable = {"max_amount", "affiliate_customer_id", "category", "referrer_segment", "starts_on", "ends_on"}
     for key, value in changes.items():
         if value is None and key not in nullable:
             continue
@@ -334,6 +357,111 @@ async def bulk(payload: BulkIn, db: AsyncSession = Depends(get_db), claims: dict
             await db.rollback()
             failed.append({"id": str(commission_id), "error": exc.detail})
     return BulkResult(done=done, failed=failed)
+
+
+# ------------------------------------------------------- discount credits
+
+
+def _discount_out(credit: ReferralDiscount, customer: Customer | None, application_reference: str | None) -> DiscountOut:
+    return DiscountOut(
+        id=credit.id, customer_id=credit.customer_id,
+        customer_name=customer.full_name if customer else None, customer_phone=customer.phone if customer else None,
+        source=credit.source, description=dsvc.describe(credit), discount_type=credit.discount_type,
+        discount_value=credit.discount_value, max_amount=credit.max_amount, expires_at=credit.expires_at,
+        status=dsvc.effective_status(credit), note=credit.note, status_note=credit.status_note,
+        applied_application_id=credit.applied_application_id, applied_application_reference=application_reference,
+        applied_amount=credit.applied_amount, applied_at=credit.applied_at, created_at=credit.created_at,
+    )
+
+
+async def _one_discount(db: AsyncSession, credit_id: uuid.UUID) -> DiscountOut:
+    credit = await db.get(ReferralDiscount, credit_id)
+    customer = await db.get(Customer, credit.customer_id)
+    application = await db.get(Application, credit.applied_application_id) if credit.applied_application_id else None
+    return _discount_out(credit, customer, application.reference if application else None)
+
+
+@router.get("/discounts", response_model=DiscountPage, dependencies=[Depends(OPERATE)])
+async def list_discounts(
+    status_: str | None = Query(None, alias="status", pattern="^(available|applied|expired|cancelled)$"),
+    customer_id: uuid.UUID | None = None,
+    q: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    conds = []
+    if status_ == "available":
+        conds += [ReferralDiscount.status == "available", or_(ReferralDiscount.expires_at.is_(None), ReferralDiscount.expires_at >= now)]
+    elif status_ == "expired":
+        conds += [ReferralDiscount.status == "available", ReferralDiscount.expires_at < now]
+    elif status_:
+        conds.append(ReferralDiscount.status == status_)
+    if customer_id:
+        conds.append(ReferralDiscount.customer_id == customer_id)
+    if q:
+        like = f"%{q.strip()}%"
+        conds.append(or_(Customer.full_name.ilike(like), Customer.phone.ilike(like)))
+
+    total = await db.scalar(
+        select(func.count()).select_from(ReferralDiscount).join(Customer, Customer.id == ReferralDiscount.customer_id).where(*conds)
+    ) or 0
+    rows = (
+        await db.execute(
+            select(ReferralDiscount, Customer, Application.reference)
+            .join(Customer, Customer.id == ReferralDiscount.customer_id)
+            .outerjoin(Application, Application.id == ReferralDiscount.applied_application_id)
+            .where(*conds)
+            .order_by(ReferralDiscount.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return DiscountPage(items=[_discount_out(c, cust, ref) for c, cust, ref in rows], total=total, limit=limit, offset=offset)
+
+
+@router.post("/discounts", response_model=DiscountOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(OPERATE)])
+async def grant_discount(payload: ManualGrantIn, db: AsyncSession = Depends(get_db), claims: dict = Depends(get_current_claims)):
+    """Staff give a customer a discount credit directly (a goodwill gesture, a
+    correction...). The reason is required and kept on the audit trail."""
+    if payload.discount_type == "percent" and payload.discount_value > 100:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A percentage discount can't be more than 100.")
+    credit = await dsvc.grant_manual(
+        db, payload.customer_id, payload.discount_type, payload.discount_value, payload.max_amount, payload.valid_days,
+        payload.reason, _user_id(claims),
+    )
+    return await _one_discount(db, credit.id)
+
+
+@router.get("/discounts/{credit_id}/applications", response_model=list[EligibleApplicationOut], dependencies=[Depends(OPERATE)])
+async def discount_applications(credit_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """The customer's recent applications, with what this credit would take off
+    each - or why it can't be applied to it."""
+    credit = await db.get(ReferralDiscount, credit_id)
+    if not credit:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Discount credit not found")
+    return await dsvc.eligible_applications(db, credit)
+
+
+@router.post("/discounts/{credit_id}/apply", response_model=DiscountOut, dependencies=[Depends(OPERATE)])
+async def apply_discount(credit_id: uuid.UUID, payload: ApplyDiscountIn, db: AsyncSession = Depends(get_db), claims: dict = Depends(get_current_claims)):
+    await dsvc.apply_credit(db, credit_id, payload.application_id, _user_id(claims), payload.reason, payload.amount)
+    return await _one_discount(db, credit_id)
+
+
+@router.post("/discounts/{credit_id}/release", response_model=DiscountOut, dependencies=[Depends(OPERATE)])
+async def release_discount(credit_id: uuid.UUID, payload: ReasonIn, db: AsyncSession = Depends(get_db), claims: dict = Depends(get_current_claims)):
+    await dsvc.release_credit(db, credit_id, _user_id(claims), payload.reason)
+    return await _one_discount(db, credit_id)
+
+
+@router.post("/discounts/{credit_id}/cancel", response_model=DiscountOut, dependencies=[Depends(OPERATE)])
+async def cancel_discount(credit_id: uuid.UUID, payload: ReasonIn, db: AsyncSession = Depends(get_db), claims: dict = Depends(get_current_claims)):
+    await dsvc.cancel_credit(db, credit_id, _user_id(claims), payload.reason)
+    return await _one_discount(db, credit_id)
 
 
 # ----------------------------------------------------------------- summary
