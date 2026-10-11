@@ -242,6 +242,23 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Partner call-to-action */}
+      <section className="px-6 py-14 md:px-12">
+        <Reveal>
+          <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card bg-brand-tint/60 px-6 py-10 text-center md:flex-row md:justify-between md:text-left">
+            <div>
+              <h2 className="text-xl font-bold md:text-2xl">Run a dealership, SACCO, bank, agency or business?</h2>
+              <p className="mt-2 max-w-xl text-ink-soft">
+                Partner with Somosure. Send your customers to quality cover and get rewarded for it.
+              </p>
+            </div>
+            <Link href="/partners">
+              <Button size="lg" className="whitespace-nowrap">Become a partner</Button>
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+
       {/* Testimonials */}
       <section className="px-6 py-16 md:px-12">
         <div className="mx-auto max-w-7xl">

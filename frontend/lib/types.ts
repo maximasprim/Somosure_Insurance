@@ -723,3 +723,48 @@ export interface EligibleApplication {
   blocked_reason: string | null;
 }
 
+// --- Partner applications ---
+
+export type PartnerApplicationStatus = "pending" | "approved" | "declined";
+
+export interface PartnerApplication {
+  id: string;
+  reference: string;
+  business_name: string;
+  partner_type: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  town: string | null;
+  website: string | null;
+  working_model: "referrals" | "applications" | "both";
+  monthly_clients: string;
+  products: string[] | null;
+  message: string;
+  status: PartnerApplicationStatus;
+  decision_reason: string | null;
+  decided_at: string | null;
+  partner_id: string | null;
+  affiliate_code: string | null;
+  created_at: string;
+}
+
+export interface PartnerApplicationPage {
+  items: PartnerApplication[];
+  total: number;
+  limit: number;
+  offset: number;
+  pending_count: number;
+}
+
+export interface PartnerApprovalResult {
+  application: PartnerApplication;
+  partner_id: string;
+  affiliate_code: string | null;
+  affiliate_link_path: string | null;
+  commission_rule_created: boolean;
+  discount_credit_created: boolean;
+  warnings: string[];
+}
+
+

@@ -6,7 +6,7 @@ import type { MetadataRoute } from "next";
 // those pages land, per spec §37's SEO page list.
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://somosure.co.ke";
-  const routes = ["", "/quote/motor", "/login", "/register"];
+  const routes = ["", "/quote/motor", "/partners", "/login", "/register"];
 
   return routes.map((route) => ({
     url: `${baseUrl}${route}`,

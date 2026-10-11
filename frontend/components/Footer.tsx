@@ -22,6 +22,7 @@ const COLUMNS = [
       { label: "About Somosure", href: "/about" },
       { label: "How it works", href: "/insurance" },
       { label: "Renewals", href: "/renewals" },
+      { label: "Become a partner", href: "/partners" },
     ],
   },
   {

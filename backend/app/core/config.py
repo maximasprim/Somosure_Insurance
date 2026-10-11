@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     #   off     - no screening at all (original behaviour).
     document_validation: str = "strict"
 
+    # Who is alerted when someone applies to become a partner (comma-separated).
+    # Emails go out through the SMTP account below, texts through the SMS
+    # provider; with neither configured the alert is only logged and the
+    # application still appears in Admin -> Partner applications.
+    partner_alert_emails: str = ""
+    partner_alert_phones: str = ""
+
     # Audit trail (see docs/AUDIT_TRAIL.md).
     audit_enabled: bool = True
     # Extra comma-separated table names to leave out of change capture

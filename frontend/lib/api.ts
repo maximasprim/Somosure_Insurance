@@ -20,6 +20,24 @@ function notifyDataChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
 }
 
+// FastAPI reports a rejected form as a LIST of problems, not a sentence. Turn it
+// into readable text ("contact email: Please enter a valid email address")
+// instead of letting it show up as "[object Object]".
+export function formatDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        const msg = typeof d?.msg === "string" ? d.msg.replace(/^Value error,\s*/, "") : null;
+        const field = Array.isArray(d?.loc) ? d.loc.filter((p: unknown) => p !== "body").join(" ").replace(/_/g, " ") : "";
+        return msg ? (field ? `${field}: ${msg}` : msg) : null;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join("; ");
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -32,7 +50,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(detail.detail ?? `Request failed: ${res.status}`);
+    throw new Error(formatDetail(detail.detail, `Request failed: ${res.status}`));
   }
   if ((options.method ?? "GET").toUpperCase() !== "GET") notifyDataChanged();
   if (res.status === 204) return undefined as T;
@@ -67,7 +85,7 @@ export async function downloadFile(path: string, filename: string): Promise<void
   const res = await fetch(`${API_BASE}${path}`, { headers: { ...authHeaders() } });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail ?? `Download failed: ${res.status}`);
+    throw new Error(formatDetail(body.detail, `Download failed: ${res.status}`));
   }
   const url = URL.createObjectURL(await res.blob());
   const link = document.createElement("a");

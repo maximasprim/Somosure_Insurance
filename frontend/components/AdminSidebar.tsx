@@ -54,6 +54,7 @@ const SECTIONS: NavSection[] = [
       { label: "Leads", href: "/admin/leads", icon: Users },
       { label: "Applications", href: "/admin/applications", icon: FileText },
       { label: "Partners", href: "/admin/partners", icon: Handshake },
+      { label: "Partner applications", href: "/admin/partner-applications", icon: Handshake },
       { label: "Affiliates", href: "/admin/affiliates", icon: Gift },
       { label: "Tasks", href: "/admin/tasks", icon: ListTodo },
     ],
