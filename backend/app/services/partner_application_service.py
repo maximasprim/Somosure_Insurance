@@ -12,6 +12,7 @@ Declining records the reason and creates nothing.
 
 import logging
 import random
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -23,10 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.phone import phone_variants
+from app.core.security import generate_reset_token, hash_password, hash_reset_token
 from app.models.affiliate import Affiliate, AffiliateRateRule, ReferralDiscount
 from app.models.customer import Customer
 from app.models.partner import Partner, PartnerApplication
+from app.models.password_reset_token import PasswordResetToken
 from app.models.referral import Referral
+from app.models.user import Role, User, UserRole
 from app.schemas.partner_application import ApproveIn, PartnerApplicationIn
 from app.services.affiliate_service import generate_affiliate_code, get_affiliate_settings
 
@@ -173,6 +177,108 @@ async def alert_team(application: dict) -> None:
             logger.exception("Could not text the partner-application alert to %s", phone)
 
 
+
+# ------------------------------------------------------- welcome + login
+ 
+ 
+# A welcome "set your password" link stays valid longer than the 30 minutes of
+# a normal forgot-password link: the partner may not open it the same day.
+WELCOME_LINK_TTL = timedelta(days=7)
+ 
+ 
+async def _ensure_login(db: AsyncSession, customer: Customer, email: str | None, now: datetime) -> tuple[str | None, str | None]:
+    """Makes sure the newly enrolled affiliate can sign in and see their referral
+    dashboard. Returns (raw set-password token or None, warning or None).
+ 
+    - Customer already has a login          -> nothing to do (no token).
+    - No account for that email yet         -> creates one with a random password
+      nobody knows, links it to the customer, and returns a single-use token so
+      the person chooses their own password (same mechanism as forgot-password).
+    - An account for that email already
+      exists but is not this customer's     -> changes nothing and warns staff;
+      we never attach someone else's login to a record automatically.
+    Runs inside the caller's transaction, so it is all-or-nothing with the approval."""
+    if customer.user_id:
+        return None, None
+    email = (email or "").strip().lower()
+    if not email:
+        return None, "There is no email on this application, so no set-password link could be sent."
+ 
+    existing = await db.scalar(select(User).where(func.lower(User.email) == email))
+    if existing:
+        return None, (
+            f"An account for {email} already exists but is not linked to this partner's customer record, so the referral "
+            "code won't appear on their dashboard yet. Ask them to log in and contact support to merge the records."
+        )
+ 
+    user = User(
+        email=email,
+        phone=customer.phone,
+        full_name=customer.full_name,
+        hashed_password=hash_password(secrets.token_urlsafe(32)),  # unusable until they set their own
+    )
+    db.add(user)
+    await db.flush()
+    role = await db.scalar(select(Role).where(Role.name == "customer"))
+    if role:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+    customer.user_id = user.id
+ 
+    raw_token = generate_reset_token()
+    db.add(PasswordResetToken(user_id=user.id, token_hash=hash_reset_token(raw_token), expires_at=now + WELCOME_LINK_TTL))
+    return raw_token, None
+ 
+ 
+def welcome_text(business_name: str, contact_name: str, referral_link: str | None, set_password_link: str | None) -> tuple[str, str, str]:
+    """(email subject, email body, SMS) for a newly approved partner."""
+    first = (contact_name or "").split(" ")[0] or "there"
+    subject = f"Welcome to Somosure - {business_name} is approved"
+    lines = [f"Hi {first},", "", f"Good news - {business_name} has been approved as a Somosure partner.", ""]
+    sms_parts = [f"Somosure: {business_name} is approved."]
+    if referral_link:
+        lines += ["Your personal referral link (share it with your customers so they are credited to you):", referral_link, ""]
+        sms_parts.append(f"Your referral link: {referral_link}")
+    if set_password_link:
+        lines += [
+            "We have created your account. Set your password here to see your referrals and earnings:",
+            set_password_link,
+            "(the link works once and expires in 7 days; if it has expired, use 'Forgot password' on the login page.)",
+            "",
+        ]
+        sms_parts.append(f"Set your password: {set_password_link}")
+    elif referral_link:
+        lines += ["Log in to your Somosure account to see your referrals and earnings.", ""]
+    else:
+        lines += ["Our team will be in touch shortly with the next steps.", ""]
+    lines += ["Thank you for partnering with us.", "The Somosure team"]
+    return subject, "\n".join(lines), " ".join(sms_parts)
+ 
+ 
+async def send_welcome(application: PartnerApplication, referral_link: str | None, set_password_link: str | None) -> list[str]:
+    """Emails and texts the approved partner. Best effort: the approval is already
+    saved, so a delivery problem is returned as a warning for staff, never raised.
+    With no SMTP / SMS provider configured the mock dispatchers only log it."""
+    from app.notifications.registry import get_dispatcher, get_email_dispatcher
+ 
+    subject, body, sms = welcome_text(application.business_name, application.contact_name, referral_link, set_password_link)
+    problems: list[str] = []
+    try:
+        result = await get_email_dispatcher().send_email(application.contact_email, subject, body)
+        if not result.delivered:
+            problems.append(f"The welcome email to {application.contact_email} was not delivered ({result.error or 'unknown reason'}) - send them their link by hand.")
+    except Exception:
+        logger.exception("Could not email the partner welcome to %s", application.contact_email)
+        problems.append(f"The welcome email to {application.contact_email} failed - send them their link by hand.")
+    try:
+        result = await get_dispatcher().send_sms(application.contact_phone, sms)
+        if not result.delivered:
+            problems.append(f"The welcome SMS to {application.contact_phone} was not delivered ({result.error or 'unknown reason'}).")
+    except Exception:
+        logger.exception("Could not text the partner welcome to %s", application.contact_phone)
+        problems.append(f"The welcome SMS to {application.contact_phone} failed.")
+    return problems
+
+
 # ------------------------------------------------------------------ deciding
 
 
@@ -233,6 +339,7 @@ async def approve_application(db: AsyncSession, application_id: Any, user_id: st
     await db.flush()
 
     affiliate_code = None
+    welcome_token = None
     commission_rule_created = False
     discount_credit_created = False
     if payload.enrol_affiliate:
@@ -260,6 +367,9 @@ async def approve_application(db: AsyncSession, application_id: Any, user_id: st
             await db.flush()
         affiliate_code = affiliate.code
         application.customer_id = customer.id
+        welcome_token, login_warning = await _ensure_login(db, customer, application.contact_email, now)
+        if login_warning:
+            warnings.append(login_warning)
 
         if payload.commission_value is not None:
             db.add(
@@ -298,6 +408,12 @@ async def approve_application(db: AsyncSession, application_id: Any, user_id: st
     application.affiliate_code = affiliate_code
     await db.commit()
     await db.refresh(application)
+
+    # Tell the partner (after the commit, so a mail problem can never undo the approval).
+    base = str(get_settings().frontend_base_url).rstrip("/")
+    referral_link = f"{base}/?ref={affiliate_code}" if affiliate_code else None
+    set_password_link = f"{base}/reset-password?token={welcome_token}" if welcome_token else None
+    warnings.extend(await send_welcome(application, referral_link, set_password_link))
 
     return {
         "application": application,

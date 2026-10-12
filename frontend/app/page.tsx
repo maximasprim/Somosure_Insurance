@@ -174,7 +174,7 @@ export default function HomePage() {
       </section>
 
       {/* How it works */}
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-12">
+      <section className="mx-auto max-w-7xl px-6 py-12 md:px-12">
         <Reveal><h2 className="text-2xl font-bold md:text-3xl">How Somosure works</h2></Reveal>
         <div className="mt-10 grid gap-8 md:grid-cols-3">
           {STEPS.map((s, i) => (
@@ -243,7 +243,7 @@ export default function HomePage() {
       </section>
 
       {/* Partner call-to-action */}
-      <section className="px-6 py-14 md:px-12">
+      <section className="px-6 py-10 md:px-12">
         <Reveal>
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card bg-brand-tint/60 px-6 py-10 text-center md:flex-row md:justify-between md:text-left">
             <div>
@@ -260,7 +260,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="px-6 py-16 md:px-12">
+      <section className="px-6 py-4 md:px-12 mb-8">
         <div className="mx-auto max-w-7xl">
           <Reveal><h2 className="text-2xl font-bold md:text-3xl">What customers say</h2></Reveal>
           <div className="mt-10 grid gap-6 md:grid-cols-3">

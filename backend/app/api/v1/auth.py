@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.context import bind_actor, note, record_event
@@ -17,6 +17,7 @@ from app.core.security import (
     hash_reset_token,
     verify_password,
 )
+from app.models.affiliate import Affiliate
 from app.models.customer import Customer
 from app.models.password_reset_token import PasswordResetToken
 from app.models.user import Role, User, UserRole
@@ -41,6 +42,33 @@ settings = get_settings()
 RESET_TOKEN_TTL = timedelta(minutes=30)
 
 
+async def _claimable_partner_customer(db: AsyncSession, email: str) -> Customer | None:
+    """A customer record created for an approved partner/affiliate (see
+    partner_application_service) that has no login yet and carries this email.
+    Registering with that email attaches the new account to it, so the partner's
+    referral code and earnings show on their dashboard instead of being stranded
+    on a duplicate record.
+ 
+    Deliberately narrow: only partner/affiliate records, and by email only.
+    Ordinary guest-quote customers (who hold applications, IDs and claims) are NOT
+    claimed - email is not verified at registration, so otherwise anyone could
+    register someone else's email and read their records. Widen this once
+    registration verifies the email address."""
+    candidates = (
+        await db.scalars(
+            select(Customer)
+            .where(func.lower(Customer.email) == email.strip().lower(), Customer.user_id.is_(None))
+            .order_by(Customer.created_at.asc())
+        )
+    ).all()
+    for c in candidates:
+        if c.lead_source == "partner_application":
+            return c
+        if await db.scalar(select(Affiliate.id).where(Affiliate.customer_id == c.id)):
+            return c
+    return None
+
+ 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await db.scalar(select(User).where(User.email == payload.email))
@@ -64,14 +92,21 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
     # /api/v1/me/* resolves against. Staff accounts (created by an admin,
     # not via this endpoint) won't get one, which is intentional: a
     # customer profile shouldn't exist for an operations user.
-    customer = Customer(
-        user_id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        phone=user.phone or "",
-        lead_source="referral" if payload.referral_code else "website",
-    )
-    db.add(customer)
+    customer = await _claimable_partner_customer(db, payload.email)
+    if customer:
+        # Attach to the partner's existing record rather than creating a duplicate.
+        customer.user_id = user.id
+        if not customer.phone and user.phone:
+            customer.phone = user.phone
+    else:
+        customer = Customer(
+            user_id=user.id,
+            full_name=user.full_name,
+            email=user.email,
+            phone=user.phone or "",
+            lead_source="referral" if payload.referral_code else "website",
+        )
+        db.add(customer)
     await db.flush()
 
     if payload.referral_code:

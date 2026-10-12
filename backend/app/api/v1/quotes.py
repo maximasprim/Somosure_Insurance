@@ -23,6 +23,15 @@ async def create_quote_request(payload: QuoteRequestCreate, db: AsyncSession = D
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"Online quotes for {category} insurance are coming soon - please talk to one of our agents.",
         )
+    # Server-side gate: a category with no live pricing (and demo mode off)
+    # is refused here, not just hidden by the browser.
+    availability = await get_category_availability(db)
+    if not availability.get(category, {}).get("available"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"Online quotes for {category} insurance are coming soon - please talk to one of our agents.",
+        )
+    
     quote_request, quotes, any_failure = await request_quotes(
         db, category, payload.answers, payload.customer_id
     )

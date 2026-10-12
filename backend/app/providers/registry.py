@@ -48,12 +48,25 @@ _REAL_ADAPTERS: dict[str, type[InsuranceProviderAdapter]] = {
 }
 
 
+# def get_adapter(provider: InsuranceProvider) -> InsuranceProviderAdapter:
+#     key = provider.name.strip().lower()
+#     if provider.integration_mode == "mock" or key not in _REAL_ADAPTERS:
+#         if provider.provider_type == "aggregator":
+#             return MockAggregatorProvider(provider_id=str(provider.id), display_name=provider.name)
+#         return MockProvider(provider_id=str(provider.id), display_name=provider.name)
+
+#     adapter_cls = _REAL_ADAPTERS[key]
+#     return adapter_cls(provider_id=str(provider.id))
 def get_adapter(provider: InsuranceProvider) -> InsuranceProviderAdapter:
+    # Any provider seeded/created as a rate-card broker uses the rate-card
+    # engine, whatever its name. New brokers need no code change.
+    if provider.integration_mode == "rate_card":
+        return RateCardAdapter(provider_id=str(provider.id))
+
     key = provider.name.strip().lower()
     if provider.integration_mode == "mock" or key not in _REAL_ADAPTERS:
         if provider.provider_type == "aggregator":
             return MockAggregatorProvider(provider_id=str(provider.id), display_name=provider.name)
         return MockProvider(provider_id=str(provider.id), display_name=provider.name)
 
-    adapter_cls = _REAL_ADAPTERS[key]
-    return adapter_cls(provider_id=str(provider.id))
+    return _REAL_ADAPTERS[key](provider_id=str(provider.id))

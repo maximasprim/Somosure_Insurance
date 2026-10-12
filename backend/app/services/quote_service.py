@@ -13,6 +13,7 @@ from app.models.customer import Customer
 from app.models.provider import InsuranceProvider
 from app.models.quote import Quote, QuoteRequest
 from app.providers.registry import get_adapter
+from app.core.config import get_settings
 
 logger = logging.getLogger("somosure.quote_service")
 
@@ -113,13 +114,23 @@ async def request_quotes(
     async def _fetch(provider: InsuranceProvider):
         nonlocal any_failure
         adapter = get_adapter(provider)
+
+        # 1. Demo/mock insurers never contribute unless demo mode is on.
+        if adapter.is_mock and not get_settings().allow_demo_quote_categories:
+            return []
+
+        # 2. Skip providers that don't offer this category (for example a
+        #    motor-only rate card asked for a medical quote). Not a failure.
         try:
-            # get_quotes_bulk() is called for EVERY provider, aggregator or
-            # not - direct insurer adapters inherit a default that just
-            # wraps get_quote() in a single-item list, so this one call
-            # handles both cases without branching here. An aggregator
-            # returning quotes from several underlying insurers naturally
-            # produces several Quote rows from one provider row.
+            offered = {p.get("category") for p in await adapter.get_products()}
+        except Exception:
+            logger.debug("Provider %s could not list products", provider.name, exc_info=True)
+            return []
+        if category not in offered:
+            return []
+
+        # 3. Everything below is your original code, unchanged.
+        try:
             normalized_quotes = await adapter.get_quotes_bulk(category, answers)
         except Exception:
             logger.exception("Provider %s failed to return a quote", provider.name)
