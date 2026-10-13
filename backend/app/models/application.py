@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, func
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +35,11 @@ class Application(Base):
 
     applicant_details: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(30), default="draft")
+    # Referral discount staff applied to this application (migration 0024).
+    # Empty means no discount; payment_service takes it off what is charged.
+    discount_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    discount_credit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    discount_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Provider-side reference once submitted through an adapter's
     # create_application/submit_application methods.
@@ -57,6 +63,8 @@ class ApplicationDocument(Base):
     size_bytes: Mapped[int] = mapped_column()
     status: Mapped[str] = mapped_column(String(20), default="uploaded")
     # uploaded | verified | rejected
+    validation_notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
