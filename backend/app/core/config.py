@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "somosure-documents"
 
-    cors_origins: str = "http://localhost:3000", "https://somosure-insuarance-ltd.vercel.app"
+    cors_origins: str = "http://localhost:3000,https://somosure-insuarance-ltd.vercel.app"
 
     # Used to build links inside emails/SMS sent to users (password reset,
     # etc.) - the frontend origin, not the API's own.
@@ -87,6 +87,41 @@ class Settings(BaseSettings):
     # demo/staging environment to let the mock insurers' demo quotes
     # through for every category instead.
     allow_demo_quote_categories: bool = False
+    
+    # ---- M-Pesa (Safaricom Daraja "M-Pesa Express" / STK push) -------------
+    # mock    - the built-in simulator. Allowed outside production only (or when
+    #           ALLOW_MOCK_PAYMENTS=true for a deliberate demo): the simulator's
+    #           signing secret is public in the repo, so it must never confirm
+    #           real policies on a live server.
+    # daraja  - real M-Pesa. Needs the MPESA_* values below. Try it with
+    #           MPESA_ENV=sandbox first (developer.safaricom.co.ke), then production.
+    mpesa_mode: str = "mock"
+    mpesa_env: str = "sandbox"  # sandbox | production
+    mpesa_consumer_key: str = ""
+    mpesa_consumer_secret: str = ""
+    mpesa_shortcode: str = ""  # Paybill number, or the Till number for buy-goods
+    mpesa_passkey: str = ""  # the Lipa Na M-Pesa Online passkey
+    mpesa_transaction_type: str = "CustomerPayBillOnline"  # or CustomerBuyGoodsOnline for a Till
+    # Public https address of THIS backend (e.g. https://somosure-backend.onrender.com).
+    # Safaricom posts payment results to <this>/api/v1/webhooks/pay/<MPESA_CALLBACK_SECRET>.
+    mpesa_callback_base_url: str = ""
+    # A long random string that is part of the callback address. Daraja callbacks
+    # carry no signature, so this secret in the URL (plus an independent
+    # confirmation call to Safaricom) is what stops anyone forging a payment.
+    mpesa_callback_secret: str = ""
+    allow_mock_payments: bool = False
+
+    # ---- Background jobs (renewal reminders, abandoned-quote recovery, ...) ----
+    # In-process scheduler. Safe with several server instances: a database lock
+    # lets only one run each job at a time. NOTE: on a host that puts the service
+    # to sleep when idle (e.g. Render's free plan) it can't run while asleep - use
+    # the CRON_SECRET endpoint below from an always-on pinger as well/instead.
+    scheduler_enabled: bool = False
+    scheduler_tick_seconds: int = 60
+    # Lets an external scheduler (cron-job.org, a Render Cron Job, GitHub Actions)
+    # trigger the jobs: POST /api/v1/internal/cron/run with header
+    # "X-Cron-Secret: <value>". Empty = that endpoint is switched off.
+    cron_secret: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

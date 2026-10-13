@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { uploadFile } from "@/lib/api";
 
 function requiredDocs(isCorporate: boolean) {
   return [
@@ -33,13 +34,7 @@ export function FinancingDocumentsStep({ financingApplicationId, isCorporate }: 
     setBusy(docType);
     setError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}/api/v1/financing/applications/${financingApplicationId}/documents?document_type=${docType}`,
-        { method: "POST", body: form }
-      );
-      if (!res.ok) throw new Error("Upload failed - please try again");
+      await uploadFile(`/api/v1/financing/applications/${financingApplicationId}/documents?document_type=${docType}`, file);
       setUploaded((prev) => ({ ...prev, [docType]: file.name }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -51,7 +46,7 @@ export function FinancingDocumentsStep({ financingApplicationId, isCorporate }: 
   return (
     <Card className="flex flex-col gap-4">
       <div>
-        <h3 className="font-semibold">Bidii Credit documents</h3>
+        <h3 className="font-semibold">Bidii Credit Documents</h3>
         <p className="mt-1 text-sm text-ink-soft">
           These are separate from your insurance application documents. PDF, JPEG, or PNG, up to 10MB each.
         </p>

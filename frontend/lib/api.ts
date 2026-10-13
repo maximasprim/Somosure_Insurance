@@ -5,10 +5,56 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
 // expired session, so those two are excluded from the auto-logout below.
 const AUTH_ENDPOINTS = ["/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh"];
 
+// Guest access tokens. When the server creates an application (or a financing
+// application) for someone who isn't logged in, it sends back a signed token for
+// THAT record in the X-Guest-Token response header. We keep it here and send it
+// with every later request, which is how the server knows the record is theirs.
+// Only the header name and a small localStorage list are involved - screens don't
+// need to know about it.
+const GUEST_HEADER = "X-Guest-Token";
+const GUEST_STORAGE_KEY = "somosure_guest_tokens";
+const MAX_GUEST_TOKENS = 10;
+
+function tokenExpiry(token: string): number {
+  // The token's payload is base64url JSON like {"k":..,"r":..,"e":<unix seconds>}.
+  // Read only to drop expired ones - the server is the real judge of validity.
+  try {
+    const body = token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
+    return Number(JSON.parse(atob(body)).e) * 1000;
+  } catch {
+    return 0;
+  }
+}
+
+function readGuestTokens(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const list = JSON.parse(window.localStorage.getItem(GUEST_STORAGE_KEY) ?? "[]") as string[];
+    return list.filter((t) => typeof t === "string" && tokenExpiry(t) > Date.now());
+  } catch {
+    return [];
+  }
+}
+
+function rememberGuestToken(res: Response) {
+  const token = res.headers.get(GUEST_HEADER);
+  if (!token || typeof window === "undefined") return;
+  try {
+    const list = [token, ...readGuestTokens().filter((t) => t !== token)].slice(0, MAX_GUEST_TOKENS);
+    window.localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    /* storage blocked - the flow still works until the page is reloaded */
+  }
+}
+
 function authHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
+  const headers: Record<string, string> = {};
   const token = window.localStorage.getItem("somosure_access_token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const guest = readGuestTokens();
+  if (guest.length) headers[GUEST_HEADER] = guest.join(",");
+  return headers;
 }
 
 // Fired after any successful change (POST/PUT/PATCH/DELETE/upload) so parts of
@@ -48,6 +94,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (typeof window !== "undefined") window.location.href = "/login";
     throw new Error("Your session has expired - please log in again.");
   }
+  rememberGuestToken(res);
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     throw new Error(formatDetail(detail.detail, `Request failed: ${res.status}`));
@@ -105,6 +152,7 @@ export function storeSession(accessToken: string, refreshToken: string) {
 export function clearSession() {
   window.localStorage.removeItem("somosure_access_token");
   window.localStorage.removeItem("somosure_refresh_token");
+  window.localStorage.removeItem(GUEST_STORAGE_KEY);
 }
 
 export function isLoggedIn(): boolean {
@@ -168,6 +216,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`${API_BASE}${path}`, { method: "POST", body: form, headers: { ...authHeaders() } });
+  rememberGuestToken(res);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const detail = body?.detail;

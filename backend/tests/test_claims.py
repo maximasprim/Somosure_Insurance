@@ -41,8 +41,24 @@ async def _create_active_policy(db_session, seeded_providers, phone="0700555111"
     return customer, policy
 
 
+async def _auth_as(client, db_session, customer, email):
+    """Claims now require a signed-in customer, so give this customer record a login
+    and return the Authorization header for it."""
+    from app.core.security import hash_password
+    from app.models.user import User
+
+    user = User(email=email, full_name=customer.full_name, hashed_password=hash_password("supersecret1"))
+    db_session.add(user)
+    await db_session.flush()
+    customer.user_id = user.id
+    await db_session.commit()
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": "supersecret1"})
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
 async def test_report_claim_against_active_policy(client, db_session, seeded_providers):
     customer, policy = await _create_active_policy(db_session, seeded_providers)
+    auth = await _auth_as(client, db_session, customer, "claimant1@example.com")
 
     res = await client.post(
         "/api/v1/claims",
@@ -53,6 +69,7 @@ async def test_report_claim_against_active_policy(client, db_session, seeded_pro
             "incident_description": "Rear-ended at a junction, minor bumper damage.",
             "incident_location": "Nairobi",
         },
+        headers=auth,
     )
     assert res.status_code == 200
     body = res.json()
@@ -67,6 +84,7 @@ async def test_cannot_claim_against_someone_elses_policy(client, db_session, see
     other_customer = Customer(full_name="Someone Else", phone="0700555333")
     db_session.add(other_customer)
     await db_session.commit()
+    auth_other = await _auth_as(client, db_session, other_customer, "claimant2@example.com")
 
     res = await client.post(
         "/api/v1/claims",
@@ -76,12 +94,14 @@ async def test_cannot_claim_against_someone_elses_policy(client, db_session, see
             "incident_date": "2026-08-01",
             "incident_description": "Trying to claim on someone else's policy.",
         },
+        headers=auth_other,
     )
     assert res.status_code == 403
 
 
 async def test_claim_upload_and_submit_flow(client, db_session, seeded_providers):
     customer, policy = await _create_active_policy(db_session, seeded_providers, phone="0700555444")
+    auth = await _auth_as(client, db_session, customer, "claimant3@example.com")
 
     report_res = await client.post(
         "/api/v1/claims",
@@ -89,24 +109,26 @@ async def test_claim_upload_and_submit_flow(client, db_session, seeded_providers
             "policy_id": str(policy.id), "customer_id": str(customer.id),
             "incident_date": "2026-08-01", "incident_description": "Windscreen cracked by a stone.",
         },
+        headers=auth,
     )
     claim_id = report_res.json()["id"]
 
     # Cannot submit without at least one document
-    early_submit = await client.post(f"/api/v1/claims/{claim_id}/submit")
+    early_submit = await client.post(f"/api/v1/claims/{claim_id}/submit", headers=auth)
     assert early_submit.status_code == 400
 
     upload_res = await client.post(
         f"/api/v1/claims/{claim_id}/documents",
         params={"document_type": "incident_photo"},
         files={"file": ("damage.jpg", io.BytesIO(b"fake jpeg bytes"), "image/jpeg")},
+        headers=auth,
     )
     assert upload_res.status_code == 200
 
     # MockProvider's submit_claim() succeeds (it's a working mock, unlike
     # the pending real-insurer adapters which raise NotImplementedError),
     # so this correctly takes the "provider accepted the claim" path.
-    submit_res = await client.post(f"/api/v1/claims/{claim_id}/submit")
+    submit_res = await client.post(f"/api/v1/claims/{claim_id}/submit", headers=auth)
     assert submit_res.status_code == 200
     assert submit_res.json()["status"] == "under_review"
     assert submit_res.json()["provider_reference"] is not None, "a successful provider submission should record its reference"
@@ -156,9 +178,11 @@ async def test_claim_falls_back_to_staff_assisted_when_provider_has_no_claims_ap
     db_session.add(policy)
     await db_session.commit()
 
+    auth = await _auth_as(client, db_session, customer, "claimant4@example.com")
     report_res = await client.post(
         "/api/v1/claims",
         json={"policy_id": str(policy.id), "customer_id": str(customer.id), "incident_date": "2026-08-01", "incident_description": "Real insurer, no claims API yet."},
+        headers=auth,
     )
     claim_id = report_res.json()["id"]
 
@@ -166,9 +190,10 @@ async def test_claim_falls_back_to_staff_assisted_when_provider_has_no_claims_ap
         f"/api/v1/claims/{claim_id}/documents",
         params={"document_type": "incident_photo"},
         files={"file": ("damage.jpg", io.BytesIO(b"fake"), "image/jpeg")},
+        headers=auth,
     )
 
-    submit_res = await client.post(f"/api/v1/claims/{claim_id}/submit")
+    submit_res = await client.post(f"/api/v1/claims/{claim_id}/submit", headers=auth)
     assert submit_res.status_code == 200
     assert submit_res.json()["status"] == "submitted", "should fall back to staff-assisted, not crash or silently fabricate a provider response"
     assert submit_res.json()["provider_reference"] is None
@@ -220,3 +245,25 @@ async def test_staff_can_transition_claim_through_valid_states_only(client, db_s
 
     events = (await db_session.scalars(select(ClaimEvent).where(ClaimEvent.claim_id == claim.id))).all()
     assert len(events) == 3  # under_review, approved, settled transitions all logged
+
+
+async def test_a_customer_cannot_read_or_change_someone_elses_claim(client, db_session, seeded_providers):
+    from app.models.customer import Customer
+
+    owner, policy = await _create_active_policy(db_session, seeded_providers, phone="0700555666")
+    auth_owner = await _auth_as(client, db_session, owner, "claimowner@example.com")
+    claim_id = (await client.post(
+        "/api/v1/claims",
+        json={"policy_id": str(policy.id), "customer_id": str(owner.id), "incident_date": "2026-08-01", "incident_description": "Private claim."},
+        headers=auth_owner,
+    )).json()["id"]
+
+    stranger = Customer(full_name="Stranger", phone="0700555777")
+    db_session.add(stranger)
+    await db_session.commit()
+    auth_stranger = await _auth_as(client, db_session, stranger, "stranger@example.com")
+
+    assert (await client.get(f"/api/v1/claims/{claim_id}", headers=auth_stranger)).status_code == 404
+    assert (await client.post(f"/api/v1/claims/{claim_id}/submit", headers=auth_stranger)).status_code == 404
+    assert (await client.get(f"/api/v1/claims/{claim_id}")).status_code == 401  # not signed in
+    assert (await client.get(f"/api/v1/claims/{claim_id}", headers=auth_owner)).status_code == 200

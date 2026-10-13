@@ -40,3 +40,16 @@ class PaymentProviderAdapter(ABC):
         """Must verify signature/shared-secret before trusting body content.
         Real adapters reject anything that doesn't verify; never assume
         webhook payloads are trustworthy just because they arrived."""
+
+    async def confirm(self, provider_transaction_id: str) -> WebhookVerificationResult | None:
+        """OPTIONAL independent check: ask the payment provider directly (server to
+        server) what happened to this transaction, rather than trusting a callback
+        that arrived over the open internet. Return None if the provider offers no
+        such check; otherwise a result whose `status` is "successful", "failed", or
+        None when there is no final answer yet."""
+        return None
+
+    def amount_matches(self, reported_amount, expected_amount) -> bool:
+        """Does the amount the provider reports equal what we asked it to collect?"""
+        return True
+

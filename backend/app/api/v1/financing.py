@@ -1,11 +1,13 @@
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_optional_customer_id
+from app.core.guest_access import GUEST_HEADER, issue_token
+from app.core.ownership import customer_for_quote, load_financing_application
 from app.core.security import get_current_claims, require_roles
 from app.models.financing import FinancingAgreement, FinancingApplication, FinancingInstallment
 from app.schemas.financing import (
@@ -51,39 +53,60 @@ async def eligibility(payload: EligibilityRequest, db: AsyncSession = Depends(ge
 
 
 @router.post("/applications", response_model=FinancingApplicationOut)
-async def create_application(payload: FinancingApplicationCreate, db: AsyncSession = Depends(get_db)):
-    return await submit_application(
+async def create_application(
+    payload: FinancingApplicationCreate,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
+):
+    customer_id = await customer_for_quote(db, authed_customer_id, payload.quote_id, payload.customer_id)
+    created = await submit_application(
         db,
-        payload.customer_id,
+        customer_id,
         payload.quote_id,
         payload.term_months,
         payload.has_existing_logbook_loan,
         payload.logbook_loan_age_months,
         payload.is_corporate,
     )
+    response.headers[GUEST_HEADER] = issue_token("financing", created.id)
+    return created
 
 
 @router.post("/applications/{application_id}/documents", response_model=FinancingDocumentOut)
 async def upload_document(
-    application_id: str, document_type: str, file: UploadFile = File(...), db: AsyncSession = Depends(get_db)
+    application_id: str,
+    request: Request,
+    document_type: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
 ):
     """Attach one of the required documents (application_form, logbook,
     national_id or certificate_of_incorporation, kra_pin, premium_quote) to
     a financing application - open to the customer, matching the same
-    no-auth-required document upload on the insurance application flow."""
+    same access rule as the insurance application flow (owner or guest token)."""
+    await load_financing_application(db, request, authed_customer_id, application_id)
     return await upload_financing_document(db, application_id, document_type, file)
 
 
 @router.get("/applications/{application_id}/documents/checklist", response_model=DocumentChecklistOut)
-async def documents_checklist(application_id: str, db: AsyncSession = Depends(get_db)):
+async def documents_checklist(
+    application_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
+):
     """Which Bidii Credit documents are already on file and which are still
     needed - read-only."""
+    await load_financing_application(db, request, authed_customer_id, application_id)
     return await financing_checklist(db, application_id, attach=False)
 
 
 @router.post("/applications/{application_id}/documents/prepare", response_model=DocumentChecklistOut)
 async def prepare_documents(
     application_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     authed_customer_id: str | None = Depends(get_optional_customer_id),
 ):
@@ -93,19 +116,28 @@ async def prepare_documents(
     generates the premium quote document, and returns only what is still
     missing - so nobody is asked for the same document twice. Safe to call
     repeatedly."""
+    await load_financing_application(db, request, authed_customer_id, application_id)
     return await financing_checklist(db, application_id, attach=True, authed_customer_id=authed_customer_id)
 
 
 @router.get("/applications/{application_id}/status", response_model=FinancingApplicationOut)
-async def get_status(application_id: str, db: AsyncSession = Depends(get_db)):
-    application = await db.get(FinancingApplication, application_id)
-    if not application:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Financing application not found")
-    return application
+async def get_status(
+    application_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
+):
+    return await load_financing_application(db, request, authed_customer_id, application_id)
 
 
 @router.get("/applications/{application_id}/agreement", response_model=FinancingAgreementOut)
-async def get_agreement(application_id: str, db: AsyncSession = Depends(get_db)):
+async def get_agreement(
+    application_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    authed_customer_id: str | None = Depends(get_optional_customer_id),
+):
+    await load_financing_application(db, request, authed_customer_id, application_id)
     agreement = await db.scalar(select(FinancingAgreement).where(FinancingAgreement.application_id == application_id))
     if not agreement:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No agreement yet for this application")

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { api } from "@/lib/api";
+import { api, uploadFile } from "@/lib/api";
 import type { Claim, CustomerProfile, DashboardData } from "@/lib/types";
 
 const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
@@ -30,13 +30,7 @@ function ClaimRow({ claim, onChanged }: { claim: Claim; onChanged: () => void })
     setUploading(true);
     setError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}/api/v1/claims/${claim.id}/documents?document_type=incident_photo`,
-        { method: "POST", body: form }
-      );
-      if (!res.ok) throw new Error("Upload failed");
+      await uploadFile(`/api/v1/claims/${claim.id}/documents?document_type=incident_photo`, file);
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");

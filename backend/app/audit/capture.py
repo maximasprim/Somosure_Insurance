@@ -34,6 +34,7 @@ logger = logging.getLogger("somosure.audit")
 
 DEFAULT_EXCLUDED_TABLES = {
     "audit_logs",
+    "scheduled_jobs",
     # already-a-history tables
     "application_events",
     "policy_events",

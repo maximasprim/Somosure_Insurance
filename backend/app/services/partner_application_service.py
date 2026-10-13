@@ -179,17 +179,17 @@ async def alert_team(application: dict) -> None:
 
 
 # ------------------------------------------------------- welcome + login
- 
- 
+
+
 # A welcome "set your password" link stays valid longer than the 30 minutes of
 # a normal forgot-password link: the partner may not open it the same day.
 WELCOME_LINK_TTL = timedelta(days=7)
- 
- 
+
+
 async def _ensure_login(db: AsyncSession, customer: Customer, email: str | None, now: datetime) -> tuple[str | None, str | None]:
     """Makes sure the newly enrolled affiliate can sign in and see their referral
     dashboard. Returns (raw set-password token or None, warning or None).
- 
+
     - Customer already has a login          -> nothing to do (no token).
     - No account for that email yet         -> creates one with a random password
       nobody knows, links it to the customer, and returns a single-use token so
@@ -203,14 +203,14 @@ async def _ensure_login(db: AsyncSession, customer: Customer, email: str | None,
     email = (email or "").strip().lower()
     if not email:
         return None, "There is no email on this application, so no set-password link could be sent."
- 
+
     existing = await db.scalar(select(User).where(func.lower(User.email) == email))
     if existing:
         return None, (
             f"An account for {email} already exists but is not linked to this partner's customer record, so the referral "
             "code won't appear on their dashboard yet. Ask them to log in and contact support to merge the records."
         )
- 
+
     user = User(
         email=email,
         phone=customer.phone,
@@ -223,12 +223,12 @@ async def _ensure_login(db: AsyncSession, customer: Customer, email: str | None,
     if role:
         db.add(UserRole(user_id=user.id, role_id=role.id))
     customer.user_id = user.id
- 
+
     raw_token = generate_reset_token()
     db.add(PasswordResetToken(user_id=user.id, token_hash=hash_reset_token(raw_token), expires_at=now + WELCOME_LINK_TTL))
     return raw_token, None
- 
- 
+
+
 def welcome_text(business_name: str, contact_name: str, referral_link: str | None, set_password_link: str | None) -> tuple[str, str, str]:
     """(email subject, email body, SMS) for a newly approved partner."""
     first = (contact_name or "").split(" ")[0] or "there"
@@ -252,14 +252,14 @@ def welcome_text(business_name: str, contact_name: str, referral_link: str | Non
         lines += ["Our team will be in touch shortly with the next steps.", ""]
     lines += ["Thank you for partnering with us.", "The Somosure team"]
     return subject, "\n".join(lines), " ".join(sms_parts)
- 
- 
+
+
 async def send_welcome(application: PartnerApplication, referral_link: str | None, set_password_link: str | None) -> list[str]:
     """Emails and texts the approved partner. Best effort: the approval is already
     saved, so a delivery problem is returned as a warning for staff, never raised.
     With no SMTP / SMS provider configured the mock dispatchers only log it."""
     from app.notifications.registry import get_dispatcher, get_email_dispatcher
- 
+
     subject, body, sms = welcome_text(application.business_name, application.contact_name, referral_link, set_password_link)
     problems: list[str] = []
     try:

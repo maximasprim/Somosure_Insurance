@@ -90,7 +90,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-neutral-border pt-6 text-xs text-ink-soft sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col items-start justify-between gap-4 border-t border-neutral-border pt-6 text-xs text-ink-soft sm:flex-row sm:items-center">
           <p>© {new Date().getFullYear()} Somosure Insurance. All rights reserved.</p>
           <p>Nairobi, Kenya</p>
         </div>

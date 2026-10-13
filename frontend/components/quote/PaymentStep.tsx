@@ -150,6 +150,35 @@ export function PaymentStep({
     }
   }
 
+  // Real M-Pesa: the customer answers the prompt on their phone, and the result
+  // reaches us from Safaricom a moment later. Ask the server every few seconds until
+  // it is final (about 3 minutes), then show the outcome. Demo payments are settled
+  // by the simulate buttons instead, so they don't poll.
+  async function checkNow() {
+    if (!payment) return;
+    try {
+      const res = await api.get<PaymentStatusResult>(`/api/v1/payments/${payment.payment_id}/status`);
+      if (res.status === "successful" || res.status === "failed") {
+        setStatus(res);
+        if (res.status === "successful" && !payment.remaining_schedule?.length) onPaid();
+      }
+    } catch {
+      /* a missed check is fine - the next one will catch up */
+    }
+  }
+
+  useEffect(() => {
+    if (!payment || payment.is_mock || status) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      void checkNow();
+      if (tries >= 60) clearInterval(timer);
+    }, 3000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payment, status]);
+
   const remaining = status?.status === "successful" ? payment?.remaining_schedule ?? [] : [];
 
   return (
@@ -257,11 +286,22 @@ export function PaymentStep({
           <p className="text-sm text-ink-soft">
             A payment prompt was sent to <strong>{phone}</strong>. Enter your M-Pesa PIN to complete it.
           </p>
-          <Badge tone="neutral">Demo environment - use the buttons below to simulate the outcome</Badge>
-          <div className="flex gap-3">
-            <Button onClick={() => handleSimulate("successful")} disabled={busy}>Simulate success</Button>
-            <Button variant="ghost" onClick={() => handleSimulate("failed")} disabled={busy}>Simulate failure</Button>
-          </div>
+          {payment.is_mock ? (
+            <>
+              <Badge tone="neutral">Demo environment - use the buttons below to simulate the outcome</Badge>
+              <div className="flex gap-3">
+                <Button onClick={() => handleSimulate("successful")} disabled={busy}>Simulate success</Button>
+                <Button variant="ghost" onClick={() => handleSimulate("failed")} disabled={busy}>Simulate failure</Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm text-ink-soft">Waiting for your confirmation on the phone - this page updates by itself.</p>
+              <Button variant="ghost" onClick={() => void checkNow()}>
+                I&apos;ve paid - check now
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

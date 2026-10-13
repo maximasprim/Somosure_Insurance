@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +11,11 @@ import app.models  # noqa: F401 - guarantees every model is registered on
 # Base.metadata regardless of which routes happen to import which model
 # classes directly (see app/models/__init__.py for why this matters).
 from app.api.v1 import admin, admin_affiliates, admin_audit, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
-from app.api.v1 import admin_partner_applications, affiliate_me, partner_applications
+from app.api.v1 import admin_partner_applications, affiliate_me, internal_cron, partner_applications
 from app.audit.capture import install as install_audit_capture
 from app.audit.middleware import AuditMiddleware
 from app.core.config import get_settings
+from app.core.guest_access import GUEST_HEADER
 from app.core.rate_limit import limiter
 from app.core.security_headers import SecurityHeadersMiddleware
 
@@ -24,11 +27,31 @@ if settings.sentry_dsn:
 
     sentry_sdk.init(dsn=settings.sentry_dsn, environment=settings.environment, traces_sample_rate=0.1)
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Starts the in-process background scheduler when SCHEDULER_ENABLED=true."""
+    task = None
+    if settings.scheduler_enabled:
+        from app.services.scheduler import scheduler_loop
+
+        task = asyncio.create_task(scheduler_loop())
+    try:
+        yield
+    finally:
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+
 app = FastAPI(
     title="Somosure Insurance Platform API",
     description="Foundation phase: auth, providers/quotes with mock adapter. "
     "See /docs for the live schema.",
     version="0.1.0-phase1",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
@@ -47,6 +70,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The browser may read this response header: it carries the guest access
+    # token issued when an application is created (see app/core/guest_access.py).
+    expose_headers=[GUEST_HEADER],
 )
 
 app.include_router(auth.router)
@@ -87,6 +113,7 @@ app.include_router(partners.router)
 app.include_router(whatsapp.router)
 app.include_router(whatsapp.admin_router)
 app.include_router(contact.router)
+app.include_router(internal_cron.router)
 
 
 @app.get("/health")

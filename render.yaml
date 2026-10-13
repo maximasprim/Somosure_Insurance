@@ -88,3 +88,30 @@ services:
         value: Somosure Insuarance
       - key: SMTP_USE_TLS
         value: "true"
+      - key: FRONTEND_BASE_URL
+        sync: false
+        # Your Vercel URL, e.g. https://somosure-insuarance-ltd.vercel.app - used in
+        # emailed links (password reset, partner welcome).
+      - key: MPESA_MODE
+        value: mock
+        # Switch to "daraja" once the MPESA_* values below are filled in.
+      - key: MPESA_ENV
+        value: sandbox
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        sync: false
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_CALLBACK_BASE_URL
+        sync: false
+        # This backend's public https address, e.g. https://somosure-backend.onrender.com
+      - key: MPESA_CALLBACK_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+        # Copy this value into the GitHub secret CRON_SECRET (see .github/workflows/scheduler.yml).
+      - key: SCHEDULER_ENABLED
+        value: "true"

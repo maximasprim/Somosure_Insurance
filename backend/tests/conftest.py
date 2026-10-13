@@ -80,10 +80,40 @@ async def client(session_factory):
     # point it at the test database like the request sessions are.
     app.state.audit_session_factory = session_factory
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+
+    # Behave like the real frontend (lib/api.ts): remember the guest-access tokens the
+    # server hands out when an application / financing application is created and send
+    # them back on later requests, so guest journeys in the tests keep working under the
+    # ownership checks. Tests that want to prove a stranger is refused use `stranger_client`.
+    from app.core.guest_access import GUEST_HEADER
+
+    held: list[str] = []
+
+    async def _remember(response):
+        token = response.headers.get(GUEST_HEADER)
+        if token and token not in held:
+            held.append(token)
+
+    async def _send(request):
+        if held and GUEST_HEADER not in request.headers:
+            request.headers[GUEST_HEADER] = ",".join(held[-12:])
+
+    async with AsyncClient(
+        transport=transport, base_url="http://test", event_hooks={"request": [_send], "response": [_remember]}
+    ) as ac:
         yield ac
     app.dependency_overrides.clear()
     app.state.audit_session_factory = None
+
+
+@pytest.fixture
+async def stranger_client(client):
+    """A second browser that holds NO guest tokens and is not logged in - used to prove
+    that someone who merely knows a record's id is refused. (Depends on `client` so the
+    app's test database wiring is already in place.)"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 
 @pytest.fixture

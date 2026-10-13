@@ -32,6 +32,7 @@ from app.models import (  # noqa: F401 - registers models on Base.metadata
     rate_card,
     referral,
     renewal,
+    scheduled_job,
     sticker,
     support,
     user,

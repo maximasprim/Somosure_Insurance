@@ -33,6 +33,7 @@ from app.models import (  # noqa: F401
     rate_card,
     referral,
     renewal,
+    scheduled_job,
     sticker,
     support,
     user,

@@ -48,7 +48,7 @@ async def _claimable_partner_customer(db: AsyncSession, email: str) -> Customer 
     Registering with that email attaches the new account to it, so the partner's
     referral code and earnings show on their dashboard instead of being stranded
     on a duplicate record.
- 
+
     Deliberately narrow: only partner/affiliate records, and by email only.
     Ordinary guest-quote customers (who hold applications, IDs and claims) are NOT
     claimed - email is not verified at registration, so otherwise anyone could
@@ -68,7 +68,7 @@ async def _claimable_partner_customer(db: AsyncSession, email: str) -> Customer 
             return c
     return None
 
- 
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await db.scalar(select(User).where(User.email == payload.email))

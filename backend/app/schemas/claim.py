@@ -6,7 +6,9 @@ from pydantic import BaseModel
 
 class ClaimReportRequest(BaseModel):
     policy_id: str
-    customer_id: str
+    # Optional and ignored for trust purposes: the claim is always filed for the
+    # signed-in customer. If sent, it must match that customer.
+    customer_id: str | None = None
     incident_date: date
     incident_description: str
     incident_location: str | None = None
