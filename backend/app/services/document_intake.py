@@ -8,12 +8,13 @@ two behave identically.
 """
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Protocol
 
 from fastapi import HTTPException, status
 
 from app.core.config import get_settings
+from app.services.document_extraction import extract_from_document
 from app.services.document_requirements import SPECS
 from app.services.document_validation import STATUS_OK, STATUS_REVIEW, validate_document
 
@@ -28,6 +29,9 @@ class IntakeOutcome:
     status: str
     notes: str | None
     file_hash: str | None
+    # Details read off the document (KRA PIN, national ID number, ...), see
+    # document_extraction.py. Empty when nothing was found or screening is off.
+    extracted: dict = field(default_factory=dict)
 
 
 def _label(document_type: str) -> str:
@@ -72,4 +76,10 @@ async def screen_upload(
         # lenient: keep it, but flag it for staff
         return IntakeOutcome(STATUS_REVIEW, (notes or problem)[:500], result.file_hash)
 
-    return IntakeOutcome(new_status, (notes[:500] if notes else None), result.file_hash)
+    # The file passed the checks - read any identity numbers printed on it.
+    # Never allowed to fail the upload: extraction returns {} on any problem.
+    try:
+        extracted = await asyncio.to_thread(extract_from_document, document_type, content)
+    except Exception:
+        extracted = {}
+    return IntakeOutcome(new_status, (notes[:500] if notes else None), result.file_hash, extracted)

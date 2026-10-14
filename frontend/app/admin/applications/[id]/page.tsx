@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
-import type { ApplicationDetail } from "@/lib/types";
+import type { ApplicationDetail, ApplicationRescanResult } from "@/lib/types";
+import { ApplicantDetailsCard } from "@/components/admin/ApplicantDetailsCard";
+import { QuoteCoverageCard } from "@/components/admin/QuoteCoverageCard";
 
 const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
   draft: "neutral",
@@ -60,6 +62,8 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
+  const [rescanMsg, setRescanMsg] = useState<string | null>(null);
+  const [rescanning, setRescanning] = useState(false);
 
   async function load() {
     try {
@@ -109,6 +113,24 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
     }
   }
 
+  async function rescanDocuments() {
+    if (!application) return;
+    setRescanning(true);
+    setRescanMsg(null);
+    setDocError(null);
+    try {
+      const result = await api.post<ApplicationRescanResult>(
+        `/api/v1/admin/applications/${application.id}/documents/rescan`
+      );
+      setRescanMsg(result.message);
+      await load();
+    } catch (e) {
+      setDocError(e instanceof Error ? e.message : "Could not re-read the documents");
+    } finally {
+      setRescanning(false);
+    }
+  }
+
   if (error && !application) {
     return <main className="mx-auto max-w-8xl px-3 py-4 text-status-error">{error}</main>;
   }
@@ -142,13 +164,12 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card>
-            <h2 className="font-semibold">Applicant details</h2>
-            <p className="mt-1 text-xs text-ink-soft">Everything submitted on the application form.</p>
-            <div className="mt-4">
-              <KeyValueGrid data={application.applicant_details} />
-            </div>
-          </Card>
+          <ApplicantDetailsCard
+            details={application.applicant_details}
+            customer={application.customer}
+            category={application.quote.category}
+            hasVehicleRecord={!!application.vehicle}
+          />
 
           <Card>
             <h2 className="font-semibold">Customer</h2>
@@ -235,52 +256,18 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
             </Card>
           )}
 
-          <Card>
-            <h2 className="font-semibold">Quote &amp; coverage</h2>
-            <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Provider</dt>
-                <dd className="mt-0.5 text-sm text-ink">
-                  {application.quote.provider_name}
-                  {application.quote.underlying_provider_name ? ` (via ${application.quote.underlying_provider_name})` : ""}
-                  {application.quote.is_mock && <span className="ml-2 text-xs text-status-error">mock</span>}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Product</dt>
-                <dd className="mt-0.5 text-sm text-ink">{application.quote.product_name ?? "-"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Premium</dt>
-                <dd className="mt-0.5 text-sm text-ink">
-                  {application.quote.currency} {application.quote.premium}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-ink-soft">Total (incl. taxes &amp; fees)</dt>
-                <dd className="mt-0.5 text-sm text-ink">
-                  {application.quote.currency} {application.quote.total}
-                </dd>
-              </div>
-            </dl>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-soft">Coverage</h3>
-                <div className="mt-2"><KeyValueGrid data={application.quote.coverage} /></div>
-              </div>
-              <div>
-                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-soft">Exclusions</h3>
-                <div className="mt-2"><KeyValueGrid data={application.quote.exclusions} /></div>
-              </div>
-              <div>
-                <h3 className="text-xs font-medium uppercase tracking-wide text-ink-soft">Deductibles</h3>
-                <div className="mt-2"><KeyValueGrid data={application.quote.deductibles} /></div>
-              </div>
-            </div>
-          </Card>
+          <QuoteCoverageCard quote={application.quote} details={application.applicant_details} />
 
           <Card>
-            <h2 className="font-semibold">Documents</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">Documents</h2>
+              {application.documents.length > 0 && (
+                <Button variant="ghost" onClick={rescanDocuments} disabled={rescanning}>
+                  {rescanning ? "Reading…" : "Re-read ID & KRA PIN"}
+                </Button>
+              )}
+            </div>
+            {rescanMsg && <p className="mt-2 text-sm text-ink-soft">{rescanMsg}</p>}
             {docError && <p className="mt-2 text-sm text-status-error">{docError}</p>}
             <div className="mt-4 flex flex-col gap-2">
               {application.documents.map((doc) => (

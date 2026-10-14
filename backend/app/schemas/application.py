@@ -107,6 +107,12 @@ class ApplicationQuoteOut(BaseModel):
     exclusions: dict
     deductibles: dict
     is_mock: bool
+    # Added for the admin "Quote & coverage" card; both optional so older
+    # callers and tests that build this object keep working unchanged.
+    category: str | None = None  # motor, property, medical, ...
+    valid_until: datetime | None = None
+    request_reference: str | None = None  # the SOM-2026-... quote request reference
+    provider_metadata: dict = {}  # quote_basis / source_document / data_confidence
 
 
 class ApplicationDetailOut(BaseModel):
@@ -123,6 +129,15 @@ class ApplicationDetailOut(BaseModel):
     insured_asset: ApplicationInsuredAssetOut | None
     documents: list[ApplicationDocumentOut]
     events: list[ApplicationEventOut]
+
+
+class ApplicationRescanOut(BaseModel):
+    """Result of re-reading details (ID number, KRA PIN, ...) from the documents
+    already uploaded on an application."""
+
+    documents_read: int
+    fields_found: list[str]
+    message: str
 
 
 class PolicyOut(BaseModel):

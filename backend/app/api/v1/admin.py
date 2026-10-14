@@ -14,11 +14,17 @@ from app.models.quote import Quote
 from app.models.rate_card import RateCardExcess, RateCardExtension, RateCardFreeBenefit, RateCardTier, RateCardVehicleClass
 from app.schemas.admin import ProductCreate, ProductOut, ProviderCreate, ProviderOut, ProviderUpdate
 from app.services.provider_deletion import force_delete_provider
-from app.schemas.application import ApplicationDetailOut, ApplicationOut, ApplicationTransitionRequest
+from app.schemas.application import (
+    ApplicationDetailOut,
+    ApplicationOut,
+    ApplicationRescanOut,
+    ApplicationTransitionRequest,
+)
 from app.services.application_service import (
     approve_application,
     get_application_detail,
     get_application_document_url,
+    rescan_application_documents,
     transition_application,
 )
 
@@ -220,3 +226,18 @@ async def get_application_document_link(application_id: str, document_id: str, d
         document_id=document_id,
     )
     return {"url": url}
+
+
+@router.post("/applications/{application_id}/documents/rescan", response_model=ApplicationRescanOut)
+async def rescan_application_details(application_id: str, db: AsyncSession = Depends(get_db)):
+    """Re-reads ID number, KRA PIN and logbook numbers from the documents already
+    uploaded on this application and appends them to its applicant details."""
+    result = await rescan_application_documents(db, application_id)
+    record_event(
+        "document.rescanned",
+        entity_type="applications",
+        entity_id=application_id,
+        summary="Re-read details from uploaded application documents",
+        fields_found=result.fields_found,
+    )
+    return result

@@ -128,6 +128,17 @@ export interface ApplicationQuote {
   exclusions: Record<string, unknown>;
   deductibles: Record<string, unknown>;
   is_mock: boolean;
+  // Added for the admin "Quote & coverage" card (all optional so older data still type-checks).
+  category?: string | null;
+  valid_until?: string | null;
+  request_reference?: string | null;
+  provider_metadata?: Record<string, unknown>;
+}
+
+export interface ApplicationRescanResult {
+  documents_read: number;
+  fields_found: string[];
+  message: string;
 }
 
 export interface ApplicationDetail {

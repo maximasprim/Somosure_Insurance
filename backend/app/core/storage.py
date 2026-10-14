@@ -36,6 +36,12 @@ class DocumentStorage(ABC):
     async def get_signed_url(self, storage_path: str, expires_seconds: int = 300) -> str:
         """Return a short-lived URL for authorized access only."""
 
+    async def read(self, storage_path: str) -> bytes:
+        """Return the stored file's bytes (used to re-read details from a document
+        that was uploaded earlier). Not abstract, so a storage backend that has
+        not implemented it keeps working for everything else."""
+        raise NotImplementedError("This storage backend cannot read files back")
+
 
 class LocalDiskStorage(DocumentStorage):
     """Dev-only. Not suitable for production - no access control beyond
@@ -52,6 +58,12 @@ class LocalDiskStorage(DocumentStorage):
         path = category_dir / safe_name
         path.write_bytes(content)
         return str(path.relative_to(self.root))
+
+    async def read(self, storage_path: str) -> bytes:
+        path = (self.root / storage_path).resolve()
+        if self.root.resolve() not in path.parents:
+            raise ValueError("Path is outside the uploads folder")
+        return path.read_bytes()
 
     async def get_signed_url(self, storage_path: str, expires_seconds: int = 300) -> str:
         # Placeholder: in dev, the app itself serves this behind auth.
@@ -103,6 +115,14 @@ class SupabaseStorage(DocumentStorage):
             )
         signed_path = resp.json()["signedURL"]  # e.g. /object/sign/<bucket>/<path>?token=...
         return f"{self.base_url}/storage/v1{signed_path}"
+
+    async def read(self, storage_path: str) -> bytes:
+        url = await self.get_signed_url(storage_path, expires_seconds=60)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Supabase Storage download failed ({resp.status_code})")
+        return resp.content
 
 
 def get_storage() -> DocumentStorage:

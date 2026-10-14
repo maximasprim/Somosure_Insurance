@@ -576,8 +576,8 @@ PIONEER_PROVIDER_EXTENSIONS = [
 #      for that same class/cover_type (a class's tiers for one cover_type
 #      must share one band_unit - see _select_tier), and documented in
 #      notes everywhere it doesn't fit as a tier.
-CIC_SOURCE_PRIVATE = "CIC Motor Private Rates, effective 1 July 2026 (New_Motor_Private_Terms_01_07_2026.pdf)"
-CIC_SOURCE_COMMERCIAL = "CIC Motor Commercial Rates, effective 1 July 2026 (New_Motor_Commercial_Terms_01_07_2026.pdf)"
+CIC_SOURCE_PRIVATE = "CIC Motor Private Rates, effective 1 July 2026."
+CIC_SOURCE_COMMERCIAL = "CIC Motor Commercial Rates, effective 1 July 2026"
 
 CIC_CLASSES = [
     {

@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import random
 import string
 import uuid
@@ -14,14 +16,24 @@ from app.models.asset import InsuredAsset, Vehicle
 from app.models.customer import Customer
 from app.models.policy import Policy
 from app.models.provider import InsuranceProduct, InsuranceProvider
-from app.models.quote import Quote
+from app.models.quote import Quote, QuoteRequest
 from app.schemas.application import (
     ApplicationCustomerOut,
     ApplicationDetailOut,
     ApplicationInsuredAssetOut,
     ApplicationQuoteOut,
+    ApplicationRescanOut,
     ApplicationVehicleOut,
 )
+from app.services.applicant_details import (
+    apply_extracted,
+    effective_applicant_details,
+    fill_customer_blanks,
+    seed_applicant_details,
+)
+from app.services.document_extraction import READABLE_FIELDS, extract_from_document
+
+logger = logging.getLogger("somosure.application_service")
 
 # Forward decisions plus corrections. "submitted" -> approved/rejected is
 # the first underwriting decision (notes optional, as before). The reverse
@@ -55,6 +67,12 @@ async def create_application(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Quote not found")
     if quote.status != "available":
         raise HTTPException(status.HTTP_409_CONFLICT, "This quote is no longer available")
+
+    # Copy what the customer filled in on the quote form onto the application,
+    # so the underwriter sees it. (The browser sends an empty dict; anything it
+    # does send still wins over the copied answers.)
+    quote_request = await db.get(QuoteRequest, quote.quote_request_id)
+    applicant_details = seed_applicant_details(applicant_details, quote_request.input_data if quote_request else None)
 
     application = Application(
         reference=generate_application_reference(),
@@ -111,12 +129,97 @@ async def upload_document(
     )
     db.add(doc)
 
+    # Append anything read off the document (KRA PIN, national ID number...) to
+    # the applicant details and fill the customer's blanks. Must never stop an
+    # upload, so any problem here is logged and ignored.
+    if outcome.extracted:
+        try:
+            await _record_extracted_details(db, application, outcome.extracted, document_type)
+        except Exception:
+            logger.warning("Could not record details read from a %s document", document_type, exc_info=True)
+
     if application.status == "draft":
         application.status = "documents_required"
 
     await db.commit()
     await db.refresh(doc)
     return doc
+
+
+async def _record_extracted_details(
+    db: AsyncSession, application: Application, fields: dict[str, str], document_type: str
+) -> None:
+    application.applicant_details = apply_extracted(application.applicant_details, fields, document_type)
+    customer = await db.get(Customer, application.customer_id)
+    if customer:
+        fill_customer_blanks(customer, fields)
+
+
+async def rescan_application_documents(db: AsyncSession, application_id: str) -> ApplicationRescanOut:
+    """Re-reads ID number / KRA PIN / logbook numbers from the documents already
+    uploaded on this application - for applications that were submitted before
+    automatic reading existed, or where a clearer copy has since been uploaded.
+    Oldest first, so the newest upload wins. Never removes anything."""
+    application = await db.get(Application, application_id)
+    if not application:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
+
+    docs = (
+        await db.scalars(
+            select(ApplicationDocument)
+            .where(
+                ApplicationDocument.application_id == application.id,
+                ApplicationDocument.document_type.in_(list(READABLE_FIELDS)),
+            )
+            .order_by(ApplicationDocument.uploaded_at.asc())
+        )
+    ).all()
+    if not docs:
+        return ApplicationRescanOut(
+            documents_read=0, fields_found=[], message="No ID, KRA PIN or logbook documents have been uploaded yet."
+        )
+
+    storage = get_storage()
+    read = 0
+    found: dict[str, str] = {}
+    for doc in docs:
+        try:
+            content = await storage.read(doc.storage_path)
+        except Exception:
+            logger.warning("Could not read stored document %s back for re-scan", doc.id, exc_info=True)
+            continue
+        read += 1
+        fields = await asyncio.to_thread(extract_from_document, doc.document_type, content)
+        if fields:
+            application.applicant_details = apply_extracted(application.applicant_details, fields, doc.document_type)
+            found.update(fields)
+
+    if found:
+        customer = await db.get(Customer, application.customer_id)
+        if customer:
+            fill_customer_blanks(customer, found)
+        await db.commit()
+        message = f"Read {len(found)} detail(s) from {read} document(s)."
+    elif read == 0:
+        message = "The uploaded files could not be opened for re-reading."
+    else:
+        message = "No ID number, KRA PIN or logbook numbers could be read - the copies may be too blurry or image-only."
+    return ApplicationRescanOut(documents_read=read, fields_found=sorted(found), message=message)
+
+
+def _resolve_product_name(product: InsuranceProduct | None, quote: Quote, category: str | None) -> str | None:
+    """What to show as the quote's "product". Rate-card and mock quotes are not
+    tied to a catalogue product row, so fall back to the cover summary the
+    provider returned (e.g. "Private car - COMPREHENSIVE cover"), then to the
+    category."""
+    if product and product.name:
+        return product.name
+    summary = (quote.coverage or {}).get("summary")
+    if isinstance(summary, str) and summary.strip():
+        return summary.strip()
+    if category:
+        return f"{category.replace('_', ' ').title()} insurance"
+    return None
 
 
 async def submit_application(db: AsyncSession, application_id: str) -> Application:
@@ -240,6 +343,8 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Quote on this application no longer exists")
     provider = await db.get(InsuranceProvider, quote.provider_id)
     product = await db.get(InsuranceProduct, quote.product_id) if quote.product_id else None
+    quote_request = await db.get(QuoteRequest, quote.quote_request_id)
+    category = quote_request.category if quote_request else None
 
     vehicle = await db.get(Vehicle, application.vehicle_id) if application.vehicle_id else None
     insured_asset = await db.get(InsuredAsset, application.insured_asset_id) if application.insured_asset_id else None
@@ -263,7 +368,9 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
         id=application.id,
         reference=application.reference,
         status=application.status,
-        applicant_details=application.applicant_details,
+        applicant_details=effective_applicant_details(
+            application.applicant_details, quote_request.input_data if quote_request else None
+        ),
         provider_reference=application.provider_reference,
         created_at=application.created_at,
         updated_at=application.updated_at,
@@ -272,7 +379,7 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
             id=quote.id,
             provider_name=provider.name if provider else "Unknown provider",
             underlying_provider_name=quote.underlying_provider_name,
-            product_name=product.name if product else None,
+            product_name=_resolve_product_name(product, quote, category),
             premium=quote.premium,
             taxes=quote.taxes,
             fees=quote.fees,
@@ -282,6 +389,10 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
             exclusions=quote.exclusions,
             deductibles=quote.deductibles,
             is_mock=quote.is_mock,
+            category=category,
+            valid_until=quote.valid_until,
+            request_reference=quote_request.reference if quote_request else None,
+            provider_metadata=quote.provider_metadata or {},
         ),
         vehicle=ApplicationVehicleOut.model_validate(vehicle) if vehicle else None,
         insured_asset=ApplicationInsuredAssetOut.model_validate(insured_asset) if insured_asset else None,
