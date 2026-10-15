@@ -115,6 +115,16 @@ class ApplicationQuoteOut(BaseModel):
     provider_metadata: dict = {}  # quote_basis / source_document / data_confidence
 
 
+class ApplicationFinancingOut(BaseModel):
+    """The Bidii Credit financing request for this same quote, if the customer made one.
+    Financing is approved separately from the insurance application, so staff see
+    its own status here rather than assuming it follows the insurance decision."""
+
+    id: uuid.UUID
+    reference: str
+    status: str
+
+
 class ApplicationDetailOut(BaseModel):
     id: uuid.UUID
     reference: str
@@ -129,6 +139,7 @@ class ApplicationDetailOut(BaseModel):
     insured_asset: ApplicationInsuredAssetOut | None
     documents: list[ApplicationDocumentOut]
     events: list[ApplicationEventOut]
+    financing: ApplicationFinancingOut | None = None
 
 
 class ApplicationRescanOut(BaseModel):

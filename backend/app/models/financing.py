@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -222,6 +222,13 @@ class FinancingSettings(Base):
     # How recent an existing Bidii Credit logbook loan must be for the
     # deposit/rate/fee concessions to apply at all.
     concession_loan_age_max_months: Mapped[int] = mapped_column(Integer, default=3)
+
+    # Whether a Bidii Credit financing request needs a staff decision. True (the
+    # default): a new request waits as "submitted" until staff approve or reject it
+    # on the financing screen, so it is decided separately from the insurance
+    # application. False: the credit provider's own instant answer stands, which
+    # is how it worked before this setting existed.
+    require_staff_approval: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     
     # Optional company-applicant terms. NULL = same as the standard terms,
     # so nothing changes until management sets one. The existing-customer

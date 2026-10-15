@@ -243,9 +243,11 @@ async def financing_checklist(
                 .order_by(FinancingDocument.uploaded_at.asc())
             )
         ).all()
+        # Oldest first, so the newest of each type wins: a document the customer
+        # uploads to REPLACE one we attached for them is the one that counts.
         out: dict[str, FinancingDocument] = {}
         for r in rows:
-            out.setdefault(r.document_type, r)
+            out[r.document_type] = r
         return out
 
     have = await own_docs()

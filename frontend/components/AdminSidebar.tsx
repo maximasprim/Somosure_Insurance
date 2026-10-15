@@ -15,7 +15,7 @@ import {
   Zap,
   Tag,
   MessageCircle,
-  BarChart3,
+  // BarChart3,
   Search,
   Menu,
   X,
@@ -89,7 +89,7 @@ const SECTIONS: NavSection[] = [
   {
     title: "Insights",
     items: [
-      { label: "Reports", href: "/admin/reports", icon: BarChart3 },
+      // { label: "Reports", href: "/admin/reports", icon: BarChart3 },
       { label: "Search", href: "/admin/search", icon: Search },
     ],
   },

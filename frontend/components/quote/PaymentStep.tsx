@@ -70,6 +70,23 @@ export function PaymentStep({
   );
 
   const financingApproved = financing?.status === "approved";
+  // Financing is approved by staff separately from the insurance application, so a
+  // new request is "submitted" (pending) until they decide it.
+  const financingPending = financing?.status === "submitted";
+
+  // While it is pending, check back every few seconds so the deposit step appears
+  // by itself the moment staff approve (or the rejection message, if they decline).
+  useEffect(() => {
+    if (!financing || financing.status !== "submitted") return;
+    const financingId = financing.id;
+    const timer = setInterval(() => {
+      api
+        .get<FinancingApplicationResult>(`/api/v1/financing/applications/${financingId}/status`)
+        .then((latest) => setFinancing((current) => (current && current.status !== latest.status ? latest : current)))
+        .catch(() => undefined); // a missed check is fine - the next one will catch up
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [financing]);
 
   // True while the customer has the financing panel open. Choosing
   // financing replaces "pay by M-Pesa now": the M-Pesa form and the
@@ -77,7 +94,7 @@ export function PaymentStep({
   // (and then only if a deposit is actually due).
   const [financeMode, setFinanceMode] = useState(false);
   const noDepositFinanced = financingApproved && financing !== null && Number(financing.deposit_amount) === 0;
-  const showMpesaForm = !payment && !noDepositFinanced && (!financeMode || financing !== null);
+  const showMpesaForm = !payment && !noDepositFinanced && !financingPending && (!financeMode || financing !== null);
 
   // Once financing is approved, only the deposit is collected via M-Pesa now
   // - the remainder is a separate Bidii Credit installment schedule, never
@@ -194,6 +211,8 @@ export function PaymentStep({
             </>
           ) : financeMode && !financing ? (
             <>Choose your financing terms below - nothing is due by M-Pesa until your financing is approved.</>
+          ) : financingPending ? (
+            <>Your financing request is with Bidii Credit for approval - nothing is due by M-Pesa until it is approved.</>
           ) : (
             <>Amount due now: <span className="font-semibold text-ink">{formatKES(amountDue)}</span></>
           )}
@@ -244,14 +263,23 @@ export function PaymentStep({
         <FinancingOption customerId={customerId} quoteId={quoteId} onApplied={setFinancing} onExpandedChange={setFinanceMode} />
       )}
 
-      {financing && financingApproved && (
+      {financing && financingApproved && <Badge tone="success">Financing approved - {financing.reference}</Badge>}
+
+      {financing && financingPending && (
         <>
-          <Badge tone="success">Financing approved - {financing.reference}</Badge>
-          <FinancingDocumentsStep financingApplicationId={financing.id} isCorporate={financing.is_corporate} />
+          <Badge tone="neutral">Financing submitted, awaiting approval - {financing.reference}</Badge>
+          <div className="rounded-control bg-brand-tint px-4 py-3 text-sm text-ink">
+            Bidii Credit financing is approved separately from your insurance. Check the documents below, add your filled loan
+            application form, and we&apos;ll review it. This page updates by itself once it&apos;s decided.
+          </div>
         </>
       )}
 
-      {financing && !financingApproved && (
+      {financing && (financingApproved || financingPending) && (
+        <FinancingDocumentsStep financingApplicationId={financing.id} isCorporate={financing.is_corporate} />
+      )}
+
+      {financing && !financingApproved && !financingPending && (
         <div className="rounded-control bg-status-error/10 px-4 py-3 text-sm text-status-error">
           Bidii Credit couldn't approve financing for this application{financing.rejection_reason ? `: ${financing.rejection_reason}` : "."}{" "}
           You can still pay the full premium below.

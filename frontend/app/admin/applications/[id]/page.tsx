@@ -256,6 +256,26 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
             </Card>
           )}
 
+          {application.financing && (
+            <Card>
+              <h2 className="font-semibold">Bidii Credit financing</h2>
+              <p className="mt-1 text-xs text-ink-soft">
+                Financing is approved separately from this insurance application - approving one does not approve the other.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-ink">{application.financing.reference}</span>
+                  <Badge tone={application.financing.status === "approved" ? "success" : application.financing.status === "rejected" ? "error" : "brand"}>
+                    {application.financing.status === "submitted" ? "awaiting approval" : application.financing.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <Link href={`/admin/financing/${application.financing.id}`} className="text-sm font-semibold text-brand-deep hover:underline">
+                  Review financing →
+                </Link>
+              </div>
+            </Card>
+          )}
+
           <QuoteCoverageCard quote={application.quote} details={application.applicant_details} />
 
           <Card>

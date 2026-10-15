@@ -277,7 +277,8 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
             {docError && <p className="mt-2 text-sm text-status-error">{docError}</p>}
             <div className="mt-4 flex flex-col gap-2">
               {requiredDocTypes.map((type) => {
-                const doc = application.documents.find((d) => d.document_type === type);
+                // Newest first: when the customer replaced a document we attached for them, show the replacement.
+                const doc = [...application.documents].reverse().find((d) => d.document_type === type);
                 return (
                   <div key={type} className="flex items-center justify-between rounded-control border border-neutral-border px-4 py-2.5">
                     <div className="flex items-center gap-3">
@@ -310,6 +311,12 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
               </p>
             ) : (
               <>
+                {application.status === "submitted" && (
+                  <p className="mt-1 text-xs text-ink-soft">
+                    Financing is decided separately from the insurance application - approving or rejecting it here does not change
+                    the insurance decision, and the insurance approval does not approve this.
+                  </p>
+                )}
                 {application.status === "rejected" && (
                   <p className="mt-1 text-xs text-ink-soft">
                     Bidii Credit auto-rejected this application. Approving here is a management-approved exception.

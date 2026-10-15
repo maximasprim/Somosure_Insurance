@@ -208,6 +208,7 @@ class FinancingSettingsOut(BaseModel):
     concession_loan_age_max_months: int
     corporate_deposit_percentage: Decimal | None = None
     corporate_interest_rate_monthly: Decimal | None = None
+    require_staff_approval: bool = True
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -230,3 +231,6 @@ class FinancingSettingsUpdate(BaseModel):
     # Send null to clear back to "same as standard".
     corporate_deposit_percentage: Decimal | None = None
     corporate_interest_rate_monthly: Decimal | None = None
+    # true = staff approve each financing request; false = the credit provider's instant decision stands.
+    # (Sending null is ignored - it can only be true or false.)
+    require_staff_approval: bool | None = None

@@ -14,12 +14,14 @@ from app.services.document_intake import screen_upload
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.asset import InsuredAsset, Vehicle
 from app.models.customer import Customer
+from app.models.financing import FinancingApplication
 from app.models.policy import Policy
 from app.models.provider import InsuranceProduct, InsuranceProvider
 from app.models.quote import Quote, QuoteRequest
 from app.schemas.application import (
     ApplicationCustomerOut,
     ApplicationDetailOut,
+    ApplicationFinancingOut,
     ApplicationInsuredAssetOut,
     ApplicationQuoteOut,
     ApplicationRescanOut,
@@ -364,6 +366,18 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
         )
     ).all()
 
+    # The customer's financing request for this same quote, if any - shown beside the
+    # insurance status because the two are approved separately.
+    financing = await db.scalar(
+        select(FinancingApplication)
+        .where(
+            FinancingApplication.quote_id == application.quote_id,
+            FinancingApplication.customer_id == application.customer_id,
+        )
+        .order_by(FinancingApplication.created_at.desc())
+        .limit(1)
+    )
+
     return ApplicationDetailOut(
         id=application.id,
         reference=application.reference,
@@ -398,6 +412,9 @@ async def get_application_detail(db: AsyncSession, application_id: str) -> Appli
         insured_asset=ApplicationInsuredAssetOut.model_validate(insured_asset) if insured_asset else None,
         documents=documents,
         events=events,
+        financing=ApplicationFinancingOut(id=financing.id, reference=financing.reference, status=financing.status)
+        if financing
+        else None,
     )
 
 

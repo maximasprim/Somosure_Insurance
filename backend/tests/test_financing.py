@@ -65,6 +65,15 @@ async def test_financing_application_creates_agreement_and_installment_schedule(
     db_session.add(quote)
     await db_session.commit()
 
+    # This test covers the automatic path - the credit provider's answer stands with
+    # no staff step - so switch "staff must approve financing" off for it. (With it on,
+    # which is the default, a new request waits for staff: see test_financing_approval.py.)
+    from app.services.financing_service import get_financing_settings
+
+    financing_settings = await get_financing_settings(db_session)
+    financing_settings.require_staff_approval = False
+    await db_session.commit()
+
     res = await client.post(
         "/api/v1/financing/applications",
         json={"customer_id": str(customer.id), "quote_id": str(quote.id), "term_months": 4},

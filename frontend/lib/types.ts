@@ -155,6 +155,15 @@ export interface ApplicationDetail {
   insured_asset: ApplicationInsuredAsset | null;
   documents: ApplicationDocument[];
   events: ApplicationEvent[];
+  // The customer's Bidii Credit request for this same quote, if any. Financing is
+  // approved separately from the insurance application.
+  financing?: ApplicationFinancing | null;
+}
+
+export interface ApplicationFinancing {
+  id: string;
+  reference: string;
+  status: string;
 }
 
 export interface PaymentInitiateResult {

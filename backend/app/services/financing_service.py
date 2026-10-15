@@ -115,6 +115,8 @@ async def get_financing_settings(db: AsyncSession) -> FinancingSettings:
 async def update_financing_settings(db: AsyncSession, payload: FinancingSettingsUpdate, actor_user_id: str | None) -> FinancingSettings:
     settings = await get_financing_settings(db)
     updates = payload.model_dump(exclude_unset=True)
+    if updates.get("require_staff_approval", True) is None:
+        updates.pop("require_staff_approval")  # a yes/no switch can't be cleared
 
     new_min = updates.get("min_term_months", settings.min_term_months)
     new_max = updates.get("max_term_months", settings.max_term_months)
@@ -306,7 +308,19 @@ async def submit_application(
     )
     application.provider_reference = result.provider_reference
 
-    if result.status == "approved":
+    financing_settings = await get_financing_settings(db)
+    if result.status == "approved" and financing_settings.require_staff_approval:
+        # The provider's check passed, but financing is its own approval, separate
+        # from the insurance application's: it stays "submitted" until staff decide it
+        # (transition_financing_application), which is also when the agreement is created.
+        db.add(
+            FinancingEvent(
+                financing_application_id=application.id,
+                event_type="awaiting_staff_approval",
+                notes="Passed the credit provider's check - waiting for a staff decision on the financing screen",
+            )
+        )
+    elif result.status == "approved":
         application.status = "approved"
         db.add(
             FinancingEvent(
