@@ -39,7 +39,7 @@ from app.schemas.financing import (
 # not these constants - see the "configurable, not hardcoded" request this
 # was built for.
 DEFAULT_DEPOSIT_PERCENTAGE = Decimal("20.00")
-MIN_TERM_MONTHS = 4
+MIN_TERM_MONTHS = 3  # the Bidii Credit IPF deck: 3 to 10 months
 MAX_TERM_MONTHS = 10
 STANDARD_INTEREST_RATE_MONTHLY = Decimal("3.50")
 PREFERRED_INTEREST_RATE_MONTHLY = Decimal("3.00")
@@ -115,8 +115,10 @@ async def get_financing_settings(db: AsyncSession) -> FinancingSettings:
 async def update_financing_settings(db: AsyncSession, payload: FinancingSettingsUpdate, actor_user_id: str | None) -> FinancingSettings:
     settings = await get_financing_settings(db)
     updates = payload.model_dump(exclude_unset=True)
-    if updates.get("require_staff_approval", True) is None:
-        updates.pop("require_staff_approval")  # a yes/no switch can't be cleared
+    # These can only hold a value, never be cleared (only the optional commission % can).
+    for required in ("require_staff_approval", "early_settlement_fee_pct", "loan_officer_commission_pct"):
+        if required in updates and updates[required] is None:
+            updates.pop(required)
 
     new_min = updates.get("min_term_months", settings.min_term_months)
     new_max = updates.get("max_term_months", settings.max_term_months)
@@ -157,6 +159,7 @@ async def check_eligibility(
     has_existing_logbook_loan: bool = False,
     logbook_loan_age_months: int | None = None,
     is_corporate: bool = False,
+    link_to_logbook_loan: bool | None = None,
 ) -> dict:
     settings = await get_financing_settings(db)
 
@@ -174,11 +177,19 @@ async def check_eligibility(
     # only applies for an existing Bidii Credit logbook loan that's still
     # young - an existing loan older than the configured window is treated
     # the same as having none.
-    concession_applied = (
+    #
+    # Linking is also the client's choice. IPF is "linked" only when they have such a loan
+    # AND choose to link this financing to it; a client with a loan who keeps it separate is
+    # "unlinked" like anyone else (standard deposit and rate, post-dated cheques). Leaving
+    # the choice unanswered counts as linking, which is how it always behaved.
+    can_link = (
         has_existing_logbook_loan
         and logbook_loan_age_months is not None
         and logbook_loan_age_months <= settings.concession_loan_age_max_months
     )
+    wants_link = True if link_to_logbook_loan is None else bool(link_to_logbook_loan)
+    concession_applied = can_link and wants_link
+    ipf_type = "linked" if concession_applied else "unlinked"
 
     deposit_percentage = Decimal("0.00") if concession_applied else settings.deposit_percentage_standard
     interest_rate_monthly = settings.interest_rate_preferred_monthly if concession_applied else settings.interest_rate_standard_monthly
@@ -198,6 +209,18 @@ async def check_eligibility(
 
     deposit = _round(quote.total * deposit_percentage / 100)
     financed_amount = quote.total - deposit
+
+    # Staff-defined pricing tiers (financing settings > pricing tiers): the monthly rate by
+    # loan size and term. The existing-customer concession keeps its preferred rate and is
+    # never overridden; otherwise a matching tier replaces the standard/corporate rate. With
+    # no tiers defined nothing changes. Matching is on the amount being FINANCED.
+    rate_tier = None
+    if not concession_applied:
+        from app.services.rate_tier_service import find_rate_tier  # local import: avoids a circular import
+
+        rate_tier = await find_rate_tier(db, financed_amount, term_months, is_corporate)
+        if rate_tier is not None:
+            interest_rate_monthly = rate_tier.interest_rate_monthly
 
     provider = get_credit_provider()
     result = await provider.check_eligibility(
@@ -235,6 +258,10 @@ async def check_eligibility(
         "interest_rate_monthly": interest_rate_monthly,
         "concession_applied": concession_applied,
         "corporate_terms_applied": corporate_terms_applied,
+        "ipf_type": ipf_type,
+        "can_link_to_logbook_loan": can_link,
+        "rate_tier_applied": rate_tier is not None,
+        "rate_tier_name": rate_tier.label if rate_tier is not None else None,
         "loan_application_fee_pct": loan_application_fee_pct if result.eligible else settings.loan_application_fee_pct,
         "loan_application_fee": loan_application_fee,
         "life_insurance_fee_pct": life_insurance_fee_pct if result.eligible else settings.life_insurance_fee_pct,
@@ -262,12 +289,24 @@ async def submit_application(
     has_existing_logbook_loan: bool = False,
     logbook_loan_age_months: int | None = None,
     is_corporate: bool = False,
+    loan_officer_code: str | None = None,
+    link_to_logbook_loan: bool | None = None,
 ) -> FinancingApplication:
     eligibility = await check_eligibility(
-        db, customer_id, quote_id, term_months, has_existing_logbook_loan, logbook_loan_age_months, is_corporate
+        db, customer_id, quote_id, term_months, has_existing_logbook_loan, logbook_loan_age_months, is_corporate, link_to_logbook_loan
     )
     if not eligibility["eligible"]:
         raise HTTPException(status.HTTP_409_CONFLICT, eligibility["reason"] or "Not eligible for financing")
+
+    # An optional Bidii loan officer code credits the sale to that officer. A code that
+    # matches nobody is refused (rather than silently dropped) so the officer isn't lost.
+    officer = None
+    if loan_officer_code and loan_officer_code.strip():
+        from app.services.ipf_service import find_active_officer_by_code
+
+        officer = await find_active_officer_by_code(db, loan_officer_code)
+        if officer is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "We couldn't find that loan officer code - check it, or leave it blank")
 
     customer = await db.get(Customer, customer_id)
     quote = await db.get(Quote, quote_id)
@@ -293,6 +332,11 @@ async def submit_application(
         has_existing_logbook_loan=has_existing_logbook_loan,
         logbook_loan_age_months=logbook_loan_age_months,
         is_corporate=is_corporate,
+        # Linked = the client has a (recent) Bidii Credit logbook loan AND chose to link this
+        # financing to it (secured by a vehicle tracker); otherwise stand-alone IPF (secured by
+        # post-dated cheques). Decided in check_eligibility; staff can change it.
+        ipf_type=eligibility["ipf_type"],
+        loan_officer_id=officer.id if officer else None,
         status="submitted",
     )
     db.add(application)
@@ -506,6 +550,20 @@ async def transition_financing_application(
 
     await db.commit()
     await db.refresh(application)
+
+    # If a loan officer is on this request and its policy already exists, open their
+    # commission now. Best effort - it must never undo or fail the decision above.
+    if to_status == "approved" and application.loan_officer_id:
+        try:
+            from app.services.ipf_service import ensure_commission_for_application
+
+            await ensure_commission_for_application(db, application)
+            await db.commit()
+        except Exception:
+            import logging
+
+            logging.getLogger("somosure.ipf").exception("Could not open the loan officer commission for %s", application.id)
+            await db.rollback()
     return application
 
 

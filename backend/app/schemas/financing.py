@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EligibilityRequest(BaseModel):
@@ -56,6 +56,8 @@ class FinancingApplicationCreate(BaseModel):
     is_corporate: bool = False
     # Corporate/company applicants need a certificate of incorporation
     # instead of a personal ID in the documents checklist.
+    # Optional Bidii loan officer code - credits the sale to that officer.
+    loan_officer_code: str | None = None
 
 
 class FinancingApplicationOut(BaseModel):
@@ -78,6 +80,7 @@ class FinancingApplicationOut(BaseModel):
     is_corporate: bool
     provider_reference: str | None
     rejection_reason: str | None
+    ipf_type: str = "unlinked"
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -189,6 +192,7 @@ class FinancingApplicationDetailOut(BaseModel):
     is_corporate: bool
     provider_reference: str | None
     rejection_reason: str | None
+    ipf_type: str = "unlinked"
     created_at: datetime
     updated_at: datetime
     documents: list[FinancingDocumentOut]
@@ -209,6 +213,9 @@ class FinancingSettingsOut(BaseModel):
     corporate_deposit_percentage: Decimal | None = None
     corporate_interest_rate_monthly: Decimal | None = None
     require_staff_approval: bool = True
+    early_settlement_fee_pct: Decimal = Decimal("3.50")
+    loan_officer_commission_pct: Decimal = Decimal("10.00")
+    somosure_commission_pct_of_premium: Decimal | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -234,3 +241,9 @@ class FinancingSettingsUpdate(BaseModel):
     # true = staff approve each financing request; false = the credit provider's instant decision stands.
     # (Sending null is ignored - it can only be true or false.)
     require_staff_approval: bool | None = None
+    # Fee for clearing a loan early, as a % of the principal still outstanding.
+    early_settlement_fee_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    # A loan officer's share of Somosure's net commission on a policy they financed.
+    loan_officer_commission_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    # Optional: Somosure's net commission as a % of premium (send null to clear).
+    somosure_commission_pct_of_premium: Decimal | None = Field(default=None, ge=0, le=100)

@@ -276,7 +276,15 @@ export function PaymentStep({
       )}
 
       {financing && (financingApproved || financingPending) && (
-        <FinancingDocumentsStep financingApplicationId={financing.id} isCorporate={financing.is_corporate} />
+        <FinancingDocumentsStep
+          financingApplicationId={financing.id}
+          isCorporate={financing.is_corporate}
+          physical={{
+            termMonths: financing.term_months,
+            monthlyInstallment: Number(financing.total_repayable) / Math.max(1, financing.term_months),
+            ipfType: financing.ipf_type ?? (financing.has_existing_logbook_loan ? "linked" : "unlinked"),
+          }}
+        />
       )}
 
       {financing && !financingApproved && !financingPending && (

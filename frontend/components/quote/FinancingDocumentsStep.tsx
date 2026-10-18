@@ -40,6 +40,33 @@ const SOURCE_NOTE: Record<string, string> = {
 
 type Fresh = { name: string; needsReview: boolean };
 
+export interface PhysicalRequirementsInfo {
+  termMonths: number;
+  monthlyInstallment: number;
+  ipfType: string;
+}
+
+// What the customer has to hand to Bidii Credit in person - none of it can be uploaded.
+function PhysicalRequirements({ termMonths, monthlyInstallment, ipfType }: PhysicalRequirementsInfo) {
+  const linked = ipfType === "linked";
+  return (
+    <div className="rounded-control border border-neutral-border px-4 py-3">
+      <p className="text-sm font-medium text-ink">To hand over to Bidii Credit</p>
+      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs text-ink-soft">
+        <li>The original vehicle logbook. The copy above is for your application; Bidii Credit also needs the original.</li>
+        {linked ? (
+          <li>Your vehicle will carry a tracker, as your Bidii Credit auto loan requires.</li>
+        ) : (
+          <li>
+            {termMonths} post-dated cheques - one for each monthly repayment of about KES{" "}
+            {Math.round(monthlyInstallment).toLocaleString("en-KE")}, dated for each due date.
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * The last page of a financing application. Everything Bidii Credit needs that
  * we already hold - the quote you chose, and the ID, KRA PIN and logbook you gave
@@ -54,9 +81,11 @@ type Fresh = { name: string; needsReview: boolean };
 export function FinancingDocumentsStep({
   financingApplicationId,
   isCorporate,
+  physical,
 }: {
   financingApplicationId: string;
   isCorporate: boolean;
+  physical?: PhysicalRequirementsInfo;
 }) {
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   const [fresh, setFresh] = useState<Record<string, Fresh>>({});
@@ -133,6 +162,8 @@ export function FinancingDocumentsStep({
           ? "All your documents are in. Bidii Credit will review them and confirm your financing."
           : `Still needed from you: ${stillNeeded.map((i) => i.label.toLowerCase()).join(", ")}.`}
       </div>
+
+      {physical && <PhysicalRequirements {...physical} />}
 
       <div className="flex flex-col gap-3">
         {items.map((doc) => {

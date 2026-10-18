@@ -90,6 +90,17 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
         logging.getLogger("somosure.affiliate").exception("Could not record referral rewards for policy %s", policy.id)
         await db.rollback()
 
+     # If this policy was financed through Bidii Credit IPF by a loan officer's sale, open
+    # that officer's commission. Same rule as above: the policy is already saved, so a
+    # problem here is logged and swallowed, never allowed to fail the issuance.
+    try:
+        from app.services.ipf_service import record_loan_officer_commission_for_policy
+
+        await record_loan_officer_commission_for_policy(db, str(policy.id))
+    except Exception:
+        logging.getLogger("somosure.ipf").exception("Could not open loan officer commission for policy %s", policy.id)
+        await db.rollback()
+
     # A rollback (above, or inside the commission code on a rare race) expires
     # loaded objects; reload the policy so the caller can still use it.
     await db.refresh(policy)

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { api } from "@/lib/api";
+import { COVER_TYPE_DESCRIPTIONS, MOTOR_EXCLUSIONS, extensionDescription } from "@/lib/coverDescriptions"; 
 import type { ExtraBenefitCatalogItem } from "@/lib/types";
 import { OTHER_OPTION, makesGrouped, modelsFor } from "@/lib/vehicleData";
 
@@ -218,6 +219,9 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
           <option value="third_party">Third Party</option>
           <option value="third_party_fire_theft">Third Party, Fire &amp; Theft</option>
         </select>
+        {coverType && COVER_TYPE_DESCRIPTIONS[coverType] && (
+          <p className="text-xs text-ink-soft">{COVER_TYPE_DESCRIPTIONS[coverType]}</p>
+        )}
         {possiblyIneligible && (
           <p className="text-xs text-amber-600">
             Comprehensive cover usually needs a vehicle value of at least KES 500,000 and an age of 15 years or
@@ -286,15 +290,29 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {extraBenefits.map((item) => (
-              <label key={item.code} className="flex items-center gap-2 text-sm text-ink">
-                <input type="checkbox" value={item.code} {...register("extensions")} className="h-4 w-4 rounded border-neutral-border" />
-                {item.label}
+              <label key={item.code} className="flex items-start gap-2 text-sm text-ink">
+                <input type="checkbox" value={item.code} {...register("extensions")} className="mt-0.5 h-4 w-4 rounded border-neutral-border" />
+                <span>
+                  {item.label}
+                  {extensionDescription(item.code) && (
+                    <span className="block text-xs text-ink-soft">{extensionDescription(item.code)}</span>
+                  )}
+                </span>
               </label>
             ))}
           </div>
         </div>
       )}
 
+      <details className="text-sm text-ink-soft sm:col-span-2">
+        <summary className="cursor-pointer font-medium text-ink">What motor insurance doesn&apos;t cover</summary>
+        <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs">
+          {MOTOR_EXCLUSIONS.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </details>
+      
       <Input label="Owner's full name" {...register("owner_name")} error={errors.owner_name?.message} />
       <Input label="Owner's phone" placeholder="07XX XXX XXX" {...register("owner_phone")} error={errors.owner_phone?.message} />
 

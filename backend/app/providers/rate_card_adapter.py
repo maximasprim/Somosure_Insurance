@@ -100,7 +100,16 @@ class RateCardAdapter(InsuranceProviderAdapter):
             fees=breakdown.stamp_duty,
             total=breakdown.total,
             coverage=coverage,
-            exclusions={"items": ["Wear and tear", "Consequential loss", "Driving under the influence"]},
+            exclusions={
+                "items": [
+                    "Wear and tear",
+                    "Mechanical or electrical breakdown",
+                    "Consequential loss",
+                    "Driving under the influence of alcohol",
+                    "Driving without a valid licence",
+                    "Use of the vehicle for a purpose not covered under the policy",
+                ]
+            },
             deductibles={"excesses": breakdown.excesses} if breakdown.excesses else {},
             payment_options=payment_options,
             metadata={

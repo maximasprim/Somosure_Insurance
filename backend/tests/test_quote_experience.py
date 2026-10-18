@@ -217,7 +217,7 @@ async def test_eligibility_includes_settings_context_for_the_ui(client, db_sessi
             json={"customer_id": str(customer.id), "quote_id": str(quote.id), "term_months": 6},
         )
     ).json()
-    assert body["min_term_months"] == 4 and body["max_term_months"] == 10
+    assert body["min_term_months"] == 3 and body["max_term_months"] == 10  # the Bidii Credit IPF deck: 3 to 10 months
     assert body["concession_loan_age_max_months"] == 3
     assert Decimal(body["standard_interest_rate_monthly"]) == Decimal("3.50")
     assert Decimal(body["preferred_interest_rate_monthly"]) == Decimal("3.00")

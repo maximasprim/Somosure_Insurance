@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { IpfPanels } from "@/components/admin/financing/IpfPanels";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AuditTimeline } from "@/components/AuditTimeline";
@@ -300,6 +301,8 @@ export default function AdminFinancingDetailPage({ params }: { params: { id: str
               })}
             </div>
           </Card>
+
+          <IpfPanels applicationId={application.id} status={application.status} onChanged={load} />
         </div>
 
         <div className="flex flex-col gap-6">

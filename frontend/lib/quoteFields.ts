@@ -149,6 +149,17 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
     ],
   },
+  last_expense: {
+    category: "last_expense",
+    title: "Last expense cover quote",
+    comingSoon: true,
+    highlights: [
+      "A lump sum to help your family with funeral and burial costs",
+      "Cover for you and your family members",
+      "An agent can talk you through the options available",
+    ],
+    fields: [],
+  },
   cargo: {
     category: "cargo",
     title: "Cargo insurance quote",

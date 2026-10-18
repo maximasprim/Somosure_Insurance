@@ -90,8 +90,11 @@ KRA_PIN = DocumentSpec(
 CERTIFICATE_OF_INCORPORATION = DocumentSpec(
     type="certificate_of_incorporation",
     label="Certificate of incorporation",
-    description="Your company's certificate of incorporation (replaces the national ID for company applicants).",
-    tips=("A CR12 or business registration certificate is not a substitute - use the certificate of incorporation.",),
+    description=(
+        "Your company's certificate of incorporation or, for a registered business, its certificate of registration "
+        "(replaces the national ID for company applicants)."
+    ),
+    tips=("A CR12 on its own isn't enough - use the certificate of incorporation, or the certificate of registration if you are a registered business.",),
     keyword_groups=(
         ("certificate of incorporation", "certificate of registration"),
         ("companies act", "registrar of companies", "business registration service", "company no", "company number"),

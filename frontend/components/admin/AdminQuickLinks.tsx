@@ -5,6 +5,8 @@ import {
   FileText,
   ShieldAlert,
   Banknote,
+  UserCheck,
+  CalendarClock,
   Building2,
   Percent,
   Zap,
@@ -31,6 +33,7 @@ const SECTIONS = [
     items: [
       { label: "Claims", href: "/admin/claims", icon: ShieldAlert, blurb: "Track and progress customer claims." },
       { label: "Financing", href: "/admin/financing", icon: Banknote, blurb: "Bidii Credit premium financing requests." },
+      { label: "Loan officers", href: "/admin/loan-officers", icon: UserCheck, blurb: "IPF loan officers, their targets and commission." },
       { label: "Providers", href: "/admin/providers", icon: Building2, blurb: "Insurer/broker integrations and status." },
       { label: "Rate cards", href: "/admin/rate-cards", icon: Percent, blurb: "Configure AMACO, Pioneer, and future brokers' rates." },
     ],
@@ -41,6 +44,7 @@ const SECTIONS = [
       { label: "Automation", href: "/admin/automation", icon: Zap, blurb: "Event-triggered rules (renewals, reminders, stickers)." },
       { label: "Stickers", href: "/admin/stickers", icon: Tag, blurb: "Motor policy sticker issuance workflow." },
       { label: "WhatsApp", href: "/admin/whatsapp", icon: MessageCircle, blurb: "Webhook status and message templates." },
+      { label: "Anniversaries", href: "/admin/anniversaries", icon: CalendarClock, blurb: "Renew all of a customer's covers on one date." },
     ],
   },
   {

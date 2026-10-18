@@ -10,6 +10,7 @@ import {
   FileText,
   ShieldAlert,
   Banknote,
+  UserCheck,
   Building2,
   Percent,
   Zap,
@@ -29,6 +30,7 @@ import {
   FileCheck2,
   CreditCard,
   RefreshCw,
+  CalendarClock,
   LifeBuoy,
   BookOpen,
 } from "lucide-react";
@@ -65,6 +67,7 @@ const SECTIONS: NavSection[] = [
       { label: "Policies", href: "/admin/policies", icon: FileCheck2 },
       { label: "Claims", href: "/admin/claims", icon: ShieldAlert },
       { label: "Financing", href: "/admin/financing", icon: Banknote },
+      { label: "Loan officers", href: "/admin/loan-officers", icon: UserCheck },
       { label: "Providers", href: "/admin/providers", icon: Building2 },
       { label: "Rate cards", href: "/admin/rate-cards", icon: Percent },
     ],
@@ -74,6 +77,7 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Payments", href: "/admin/payments", icon: CreditCard },
       { label: "Renewals", href: "/admin/renewals", icon: RefreshCw },
+      { label: "Anniversaries", href: "/admin/anniversaries", icon: CalendarClock },
       { label: "Support tickets", href: "/admin/support", icon: LifeBuoy },
     ],
   },

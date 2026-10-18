@@ -20,6 +20,7 @@ const PRODUCTS = [
   { category: "cargo", name: "Cargo insurance", href: "/quote/cargo", desc: "Local and marine cover for goods in transit - by road, rail, sea or air.", comingSoon: true },
   { category: "hull", name: "Hull insurance", href: "/quote/hull", desc: "Cover for boats, vessels and their machinery.", comingSoon: true },
   { category: "cybersecurity", name: "Cybersecurity insurance", href: "/quote/cybersecurity", desc: "Protection against data breaches, ransomware and the downtime they cause.", comingSoon: true },
+  { category: "last_expense", name: "Last expense cover", href: "/quote/last_expense", desc: "A lump sum to help your family with funeral and burial costs, so they are not left carrying them.", comingSoon: true },
 ];
 
 export default function InsurancePage() {

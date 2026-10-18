@@ -94,6 +94,18 @@ class FinancingApplication(Base):
     # not fabricated here.
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
 
+    # --- IPF specifics (see ipf.py / ipf_service.py) -----------------------------
+    # "linked" = the client also has a Bidii Credit auto/logbook loan and the vehicle
+    # carries a tracker; "unlinked" = IPF on its own (deposit + post-dated cheques).
+    # Worked out from has_existing_logbook_loan when the request is made; staff can change it.
+    ipf_type: Mapped[str] = mapped_column(String(10), default="unlinked", server_default="unlinked")
+    loan_officer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("loan_officers.id"))
+    tracker_provider: Mapped[str | None] = mapped_column(String(80))
+    tracker_device_id: Mapped[str | None] = mapped_column(String(80))
+    tracker_installed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When staff confirmed the ORIGINAL logbook was handed in (the system only holds a scan).
+    original_logbook_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -229,6 +241,16 @@ class FinancingSettings(Base):
     # application. False: the credit provider's own instant answer stands, which
     # is how it worked before this setting existed.
     require_staff_approval: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+
+    # Fee charged when a client clears the loan before its agreed term, as a % of the
+    # principal still outstanding (the interest still to come is waived in return).
+    early_settlement_fee_pct: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=Decimal("3.50"), server_default="3.50")
+    # A loan officer's share of Somosure's net commission on a policy they financed.
+    loan_officer_commission_pct: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=Decimal("10.00"), server_default="10.00")
+    # Optional: if set, Somosure's net commission on a financed policy is taken as this %
+    # of the premium, so officers' commission is worked out automatically. Left empty
+    # (the default) finance enters the real net commission per policy instead.
+    somosure_commission_pct_of_premium: Mapped[Numeric | None] = mapped_column(Numeric(5, 2))
     
     # Optional company-applicant terms. NULL = same as the standard terms,
     # so nothing changes until management sets one. The existing-customer

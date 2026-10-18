@@ -11,7 +11,7 @@ import app.models  # noqa: F401 - guarantees every model is registered on
 # Base.metadata regardless of which routes happen to import which model
 # classes directly (see app/models/__init__.py for why this matters).
 from app.api.v1 import admin, admin_affiliates, admin_audit, admin_claims, admin_content, admin_customers, admin_ops, admin_rate_cards, admin_users, applications, auth, automation, claims, content, contact, financing, leads, me, partners, payments, policies, quotes, reports, search, stickers, whatsapp
-from app.api.v1 import admin_partner_applications, affiliate_me, internal_cron, partner_applications
+from app.api.v1 import admin_ipf, admin_partner_applications, admin_pricing, affiliate_me, internal_cron, partner_applications
 from app.audit.capture import install as install_audit_capture
 from app.audit.middleware import AuditMiddleware
 from app.core.config import get_settings
@@ -102,6 +102,11 @@ app.include_router(automation.router)
 app.include_router(stickers.router)
 app.include_router(financing.router)
 app.include_router(financing.admin_router)
+app.include_router(admin_ipf.router)
+app.include_router(admin_ipf.officers_router)
+app.include_router(admin_pricing.tiers_router)
+app.include_router(admin_pricing.anniversary_config_router)
+app.include_router(admin_pricing.anniversary_plan_router)
 app.include_router(reports.router)
 app.include_router(claims.router)
 app.include_router(admin_claims.router)

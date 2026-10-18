@@ -12,6 +12,7 @@ import {
     Truck,
     Ship,
     LockKeyhole,
+    HeartHandshake,
     UserCheck,
     Scale,
     HardHat,
@@ -42,6 +43,7 @@ const ICONS: Record<string, LucideIcon> = {
     cargo: Truck,
     hull: Ship,
     cybersecurity: LockKeyhole,
+    last_expense: HeartHandshake,
 };
 
 const AUTOPLAY_MS = 3200;

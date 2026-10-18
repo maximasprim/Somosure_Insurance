@@ -295,6 +295,13 @@ export interface AppNotification {
 }
 
 export interface EligibilityResult {
+  // Set when a staff-defined pricing tier (by loan size and term) decided the rate.
+  rate_tier_applied?: boolean;
+  rate_tier_name?: string | null;
+  // linked = a recent Bidii Credit logbook loan AND the client chose to link; otherwise unlinked.
+  ipf_type?: "linked" | "unlinked" | string;
+  // True when their loan is recent enough that they are offered the choice to link.
+  can_link_to_logbook_loan?: boolean;
   eligible: boolean;
   reason: string | null;
   total_premium: string;
@@ -321,6 +328,7 @@ export interface EligibilityResult {
 }
 
 export interface FinancingApplicationResult {
+  ipf_type?: "linked" | "unlinked" | string;
   id: string;
   reference: string;
   status: string;

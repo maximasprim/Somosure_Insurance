@@ -68,6 +68,7 @@ async def create_application(
         payload.has_existing_logbook_loan,
         payload.logbook_loan_age_months,
         payload.is_corporate,
+        payload.loan_officer_code,
     )
     response.headers[GUEST_HEADER] = issue_token("financing", created.id)
     return created

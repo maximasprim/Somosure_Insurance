@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
+import { day, kes, type RenewalAlignment } from "@/lib/pricing";
 
 interface RenewalRow {
   id: string;
@@ -12,6 +13,8 @@ interface RenewalRow {
   customer_name: string;
   due_date: string;
   status: string;
+  // Set when the customer has a common anniversary: how this renewal would be aligned to it.
+  alignment?: RenewalAlignment | null;
 }
 
 const STATUSES = ["due", "contacted", "quoted", "paid", "renewed", "lost"];
@@ -100,6 +103,16 @@ export default function AdminRenewalsPage() {
                   <p className="mt-1 text-xs text-ink-soft">
                     {r.customer_name} · due {r.due_date}
                   </p>
+                  {r.alignment && (
+                    <p className="mt-1 text-xs text-ink-soft">
+                      Anniversary {day(r.alignment.anniversary_date)}:{" "}
+                      {r.alignment.strategy === "already_aligned"
+                        ? "already lined up - renew for a full year"
+                        : `renew for ${r.alignment.term_days} days, to ${day(r.alignment.new_end)}`}
+                      {" "}· est. {kes(r.alignment.estimated_premium)}
+                      {r.alignment.very_short ? " · very short cover" : ""}
+                    </p>
+                  )}
                 </div>
                 <select className={selectClass} value={r.status} onChange={(e) => updateStatus(r, e.target.value)}>
                   {STATUSES.map((s) => (

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { api, getTokenRole } from "@/lib/api";
 import { FinancingApprovalSetting } from "@/components/admin/FinancingApprovalSetting";
+import { IpfSettingsCard } from "@/components/admin/IpfSettingsCard";
+import { RateTiersCard } from "@/components/admin/RateTiersCard";
 import type { FinancingSettings } from "@/lib/types";
 
 type FormState = Record<keyof Omit<FinancingSettings, "updated_at">, string>;
@@ -140,6 +142,8 @@ export default function FinancingSettingsPage() {
       )}
 
       <FinancingApprovalSetting canEdit={canEdit} />
+      <IpfSettingsCard canEdit={canEdit} />
+      <RateTiersCard canEdit={canEdit} />
 
       <Card className="mt-6 flex flex-col gap-4">
         {FIELDS.map((field) => (

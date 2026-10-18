@@ -135,6 +135,21 @@ async def list_renewals(
     stmt = stmt.order_by(Renewal.due_date.asc()).limit(limit)
 
     rows = (await db.execute(stmt)).all()
+
+    # For customers who have a common anniversary, show how each renewal would be aligned to it.
+    # This is extra information laid over the list, so a problem working it out (say a table that
+    # hasn't been migrated yet) must never stop the renewals themselves from showing.
+    alignments: dict = {}
+    try:
+        from app.services.anniversary_service import renewal_alignments
+
+        async with db.begin_nested():
+            alignments = await renewal_alignments(db, [renewal for renewal, _, _ in rows])
+    except Exception:
+        import logging
+
+        logging.getLogger("somosure.anniversary").exception("Could not work out renewal alignments")
+
     return [
         RenewalListOut(
             id=renewal.id,
@@ -143,6 +158,7 @@ async def list_renewals(
             due_date=renewal.due_date,
             status=renewal.status,
             created_at=renewal.created_at,
+            alignment=alignments.get(renewal.id),
         )
         for renewal, policy_number, customer_name in rows
     ]

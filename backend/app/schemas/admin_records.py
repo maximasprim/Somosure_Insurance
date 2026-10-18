@@ -4,6 +4,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from app.schemas.pricing_config import RenewalAlignmentOut
+
 
 class PolicyListOut(BaseModel):
     id: uuid.UUID
@@ -37,6 +39,8 @@ class RenewalListOut(BaseModel):
     due_date: date
     status: str
     created_at: datetime
+    # Set when the customer has a common anniversary: how this renewal would be aligned to it.
+    alignment: RenewalAlignmentOut | None = None
 
 
 class RenewalUpdate(BaseModel):

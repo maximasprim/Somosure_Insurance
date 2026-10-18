@@ -7,10 +7,10 @@ import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
 import type { EligibilityResult, FinancingApplicationResult } from "@/lib/types";
 
-// Loan term must be 4-10 months - mirrors the FinancingSettings default
+// Loan term must be 3-10 months - mirrors the FinancingSettings default
 // range (admin-editable, so the actual live bounds may differ; the
 // eligibility check on the backend is still the source of truth).
-const DEFAULT_TERM_OPTIONS = [4, 6, 10];
+const DEFAULT_TERM_OPTIONS = [3, 6, 10];
 
 // Build the term buttons from the live admin-configured bounds when the
 // eligibility response carries them (so changing the min/max term in admin
@@ -43,7 +43,10 @@ export function FinancingOption({
   const [term, setTerm] = useState(6);
   const [hasExistingLogbookLoan, setHasExistingLogbookLoan] = useState(false);
   const [loanAgeMonths, setLoanAgeMonths] = useState("");
+  // Having a recent Bidii Credit logbook loan lets the client LINK this financing to it - their choice.
+  const [linkToLoan, setLinkToLoan] = useState(true);
   const [isCorporate, setIsCorporate] = useState(false);
+  const [loanOfficerCode, setLoanOfficerCode] = useState("");
   const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,8 @@ export function FinancingOption({
     newTerm = term,
     existingLoan = hasExistingLogbookLoan,
     loanAge = parsedLoanAge(),
-    corporate = isCorporate
+    corporate = isCorporate,
+    link = linkToLoan
   ) {
     setTerm(newTerm);
     setBusy(true);
@@ -77,6 +81,7 @@ export function FinancingOption({
         has_existing_logbook_loan: existingLoan,
         logbook_loan_age_months: existingLoan ? loanAge : undefined,
         is_corporate: corporate,
+        link_to_logbook_loan: existingLoan ? link : undefined,
       });
       if (ticket === latestCheck.current) setEligibility(res);
     } catch (e) {
@@ -111,6 +116,11 @@ export function FinancingOption({
     checkEligibility(term, hasExistingLogbookLoan, parsedLoanAge(), next);
   }
 
+  function changeLink(next: boolean) {
+    setLinkToLoan(next);
+    checkEligibility(term, hasExistingLogbookLoan, parsedLoanAge(), isCorporate, next);
+  }
+
   function toggleExistingLoan() {
     const next = !hasExistingLogbookLoan;
     setHasExistingLogbookLoan(next);
@@ -127,7 +137,9 @@ export function FinancingOption({
         term_months: term,
         has_existing_logbook_loan: hasExistingLogbookLoan,
         logbook_loan_age_months: hasExistingLogbookLoan ? parsedLoanAge() : undefined,
+        link_to_logbook_loan: hasExistingLogbookLoan ? linkToLoan : undefined,
         is_corporate: isCorporate,
+        loan_officer_code: loanOfficerCode.trim() || undefined,
       });
       onApplied(application);
     } catch (e) {
@@ -205,10 +217,31 @@ export function FinancingOption({
                   }.`
                 : eligibility?.concession_applied
                 ? "Great - your existing-customer terms are applied below."
+                : eligibility?.can_link_to_logbook_loan
+                ? "You chose to keep this financing separate, so the standard deposit and rate apply."
                 : `Reduced terms only apply to a loan taken within the last ${
                     eligibility?.concession_loan_age_max_months ?? "few"
                   } months - standard terms apply for now.`}
             </p>
+
+            {eligibility?.can_link_to_logbook_loan && (
+              <fieldset className="mt-3">
+                <legend className="text-xs font-medium text-ink">Link this financing to that loan?</legend>
+                <label className="mt-1.5 flex items-start gap-2 text-xs text-ink-soft">
+                  <input type="radio" name="link-to-loan" className="mt-0.5" checked={linkToLoan} onChange={() => changeLink(true)} />
+                  <span>
+                    <span className="font-medium text-ink">Yes, link it</span> - no deposit, plus your reduced rate and fees. Your vehicle will carry a tracker.
+                  </span>
+                </label>
+                <label className="mt-1.5 flex items-start gap-2 text-xs text-ink-soft">
+                  <input type="radio" name="link-to-loan" className="mt-0.5" checked={!linkToLoan} onChange={() => changeLink(false)} />
+                  <span>
+                    <span className="font-medium text-ink">No, keep it separate</span> - the standard deposit and rate apply, and you leave post-dated cheques for the
+                    repayments.
+                  </span>
+                </label>
+              </fieldset>
+            )}
           </div>
         )}
       </div>
@@ -227,6 +260,19 @@ export function FinancingOption({
           Company applications use your certificate of incorporation instead of a national ID.
         </p>
       )}
+
+      <label className="flex flex-col gap-1 text-sm text-ink-soft">
+        <span>
+          Bidii Credit loan officer code <span className="text-xs">(optional - if an officer introduced you)</span>
+        </span>
+        <input
+          type="text"
+          value={loanOfficerCode}
+          onChange={(e) => setLoanOfficerCode(e.target.value)}
+          placeholder="e.g. BC-014"
+          className="max-w-xs rounded-control border border-neutral-border bg-white px-3 py-2 text-sm text-ink"
+        />
+      </label>
 
       {eligibility && eligibility.eligible && (
         <div className={`flex flex-col gap-3 text-sm transition-opacity ${busy ? "opacity-50" : "opacity-100"}`} aria-busy={busy}>
@@ -256,6 +302,7 @@ export function FinancingOption({
             <div>
               <p className="text-ink-soft">Interest rate</p>
               <p className="font-semibold">{eligibility.interest_rate_monthly}%/month</p>
+              {eligibility.rate_tier_applied && <p className="text-xs text-ink-soft">Rate for a loan of this size and term</p>}
             </div>
             <div>
               <p className="text-ink-soft">Total repayable</p>

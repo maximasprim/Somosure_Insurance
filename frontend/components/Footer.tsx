@@ -14,6 +14,7 @@ const COLUMNS = [
       { label: "Cargo", href: "/quote/cargo" },
       { label: "Hull", href: "/quote/hull" },
       { label: "Cybersecurity", href: "/quote/cybersecurity" },
+      { label: "Last expense", href: "/quote/last_expense" },
     ],
   },
   {

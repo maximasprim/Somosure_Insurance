@@ -35,6 +35,7 @@ const INSURE_OPTIONS = [
   { category: "cargo", name: "Cargo", href: "/quote/cargo", desc: "Local and marine cover for goods in transit.", comingSoon: true },
   { category: "hull", name: "Hull", href: "/quote/hull", desc: "Cover for boats, vessels and their machinery.", comingSoon: true },
   { category: "cybersecurity", name: "Cybersecurity", href: "/quote/cybersecurity", desc: "Protection against data breaches and ransomware.", comingSoon: true },
+  { category: "last_expense", name: "Last expense", href: "/quote/last_expense", desc: "A lump sum to help your family with funeral and burial costs.", comingSoon: true },
 ];
 
 const TRUST_ROW = [

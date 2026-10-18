@@ -29,7 +29,8 @@ QUOTABLE_CATEGORIES = (
 # Announced products with no pricing at all yet. Always shown as "coming
 # soon, talk to an agent" - even in demo mode - and refused by the quote API,
 # so no made-up premium can ever be produced for them.
-COMING_SOON_ALWAYS = ("cargo", "hull", "cybersecurity")
+# last_expense: on Somosure's product list but with no insurer or pricing connected yet.
+COMING_SOON_ALWAYS = ("cargo", "hull", "cybersecurity", "last_expense")
 
 ALL_CATEGORIES = QUOTABLE_CATEGORIES + COMING_SOON_ALWAYS
 
