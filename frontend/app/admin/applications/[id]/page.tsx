@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
 import type { ApplicationDetail, ApplicationRescanResult } from "@/lib/types";
 import { ApplicantDetailsCard } from "@/components/admin/ApplicantDetailsCard";
+import { isComprehensiveCover } from "@/lib/applicationDisplay";
 import { QuoteCoverageCard } from "@/components/admin/QuoteCoverageCard";
 
 const STATUS_TONE: Record<string, "success" | "neutral" | "error" | "brand"> = {
@@ -169,6 +170,8 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
             customer={application.customer}
             category={application.quote.category}
             hasVehicleRecord={!!application.vehicle}
+            isComprehensive={isComprehensiveCover(application.quote.provider_metadata, application.applicant_details)}
+            vehicleRecord={application.vehicle}
           />
 
           <Card>
@@ -283,7 +286,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
               <h2 className="font-semibold">Documents</h2>
               {application.documents.length > 0 && (
                 <Button variant="ghost" onClick={rescanDocuments} disabled={rescanning}>
-                  {rescanning ? "Reading…" : "Re-read ID & KRA PIN"}
+                  {rescanning ? "Reading…" : "Re-read documents"}
                 </Button>
               )}
             </div>

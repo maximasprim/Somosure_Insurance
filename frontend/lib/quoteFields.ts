@@ -1,4 +1,4 @@
-export type FieldType = "text" | "number" | "date" | "select" | "tel" | "checkboxes";
+export type FieldType = "text" | "number" | "date" | "select" | "tel" | "email" | "checkboxes";
 
 export interface FieldOption {
   value: string;
@@ -60,6 +60,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       ] },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   life: {
@@ -75,6 +76,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       ] },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   travel: {
@@ -92,6 +94,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       ] },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   property: {
@@ -147,6 +150,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   last_expense: {
@@ -202,6 +206,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       { name: "occupation", label: "Occupation", type: "text", required: true },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   professional_indemnity: {
@@ -218,6 +223,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       ] },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
   wiba: {
@@ -234,6 +240,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
       ] },
       { name: "full_name", label: "Your full name", type: "text", required: true },
       { name: "phone", label: "Your phone number", type: "tel", required: true, placeholder: "07XX XXX XXX" },
+      { name: "email", label: "Your email (optional)", type: "email", placeholder: "you@example.com", description: "So we have your contact details on record." },
     ],
   },
 };

@@ -122,6 +122,10 @@ def _check_content(spec: DocumentSpec | None, text: str, source: str) -> tuple[s
         return "skipped", None
     if _alnum_count(text) < MIN_TEXT_CHARS_TO_JUDGE:
         return "unreadable", None
+    if spec.excluded_phrases:
+        norm = _norm(text)
+        if any(f" {_norm(p).strip()} " in norm for p in spec.excluded_phrases):
+            return "mismatch", None
     hits = _content_hits(spec, text)
     if hits >= spec.min_hits:
         return "verified", f"Recognised as {_name(spec)} from its {source}."
@@ -172,11 +176,16 @@ def _validate_pdf(spec: DocumentSpec | None, content: bytes, file_hash: str) -> 
     try:
         reader = PdfReader(io.BytesIO(content))
         if reader.is_encrypted:
+            # "Encrypted" is not the same as "locked": many PDFs (valuers' reports,
+            # bank statements, iTax certificates) carry an owner password that only
+            # restricts copying/editing and open with a blank password. pypdf keeps
+            # reporting is_encrypted=True even after a successful unlock, so the
+            # outcome of decrypt() is what says whether the file can be read.
             try:
-                reader.decrypt("")
+                unlocked = bool(reader.decrypt(""))
             except Exception:
-                pass
-            if reader.is_encrypted:
+                unlocked = False
+            if not unlocked:
                 return _reject(
                     "pdf", file_hash, "This PDF is password-protected. Please remove the password (or print it to a new PDF) and upload it again."
                 )

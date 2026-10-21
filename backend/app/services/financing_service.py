@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storage
 from app.services.document_intake import screen_upload
+from app.services.application_service import _resolve_product_name
 from app.financing.registry import get_credit_provider
 from app.models.customer import Customer
 from app.models.financing import (
@@ -23,7 +24,7 @@ from app.models.financing import (
 )
 from app.models.crm import Lead, Task
 from app.models.provider import InsuranceProduct, InsuranceProvider
-from app.models.quote import Quote
+from app.models.quote import Quote, QuoteRequest
 from app.schemas.financing import (
     FinancingAgreementOut,
     FinancingApplicationDetailOut,
@@ -116,7 +117,7 @@ async def update_financing_settings(db: AsyncSession, payload: FinancingSettings
     settings = await get_financing_settings(db)
     updates = payload.model_dump(exclude_unset=True)
     # These can only hold a value, never be cleared (only the optional commission % can).
-    for required in ("require_staff_approval", "early_settlement_fee_pct", "loan_officer_commission_pct"):
+    for required in ("require_staff_approval", "early_settlement_fee_pct", "loan_officer_commission_pct", "existing_loan_max_months"):
         if required in updates and updates[required] is None:
             updates.pop(required)
 
@@ -124,6 +125,14 @@ async def update_financing_settings(db: AsyncSession, payload: FinancingSettings
     new_max = updates.get("max_term_months", settings.max_term_months)
     if new_min > new_max:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "min_term_months cannot be greater than max_term_months")
+
+    new_window = updates.get("concession_loan_age_max_months", settings.concession_loan_age_max_months)
+    new_existing_max = updates.get("existing_loan_max_months", settings.existing_loan_max_months)
+    if new_existing_max < new_window:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "The existing-loan window can't be shorter than the concession window (the concession window is the shorter one)",
+        )
 
     for field, value in updates.items():
         setattr(settings, field, value)
@@ -182,14 +191,21 @@ async def check_eligibility(
     # AND choose to link this financing to it; a client with a loan who keeps it separate is
     # "unlinked" like anyone else (standard deposit and rate, post-dated cheques). Leaving
     # the choice unanswered counts as linking, which is how it always behaved.
-    can_link = (
-        has_existing_logbook_loan
-        and logbook_loan_age_months is not None
-        and logbook_loan_age_months <= settings.concession_loan_age_max_months
-    )
-    wants_link = True if link_to_logbook_loan is None else bool(link_to_logbook_loan)
-    concession_applied = can_link and wants_link
-    ipf_type = "linked" if concession_applied else "unlinked"
+    #
+    # Two windows apply to the loan's age. The EXISTING-LOAN window (default 10 months) is how old
+    # the loan can be and still be linked to - it is still running. The shorter CONCESSION window
+    # is how recent it must be for the deposit, rate and fee waivers. A loan between the two can be
+    # linked (tracker instead of cheques) but gets the standard deposit, rate and fees.
+    concession_window = settings.concession_loan_age_max_months
+    existing_window = max(settings.existing_loan_max_months, concession_window)
+    has_loan = bool(has_existing_logbook_loan and logbook_loan_age_months is not None)
+    can_link = has_loan and logbook_loan_age_months <= existing_window
+    concession_eligible = has_loan and logbook_loan_age_months <= concession_window
+    # Unanswered counts as linking only where the waivers apply - exactly how it always behaved.
+    wants_link = concession_eligible if link_to_logbook_loan is None else bool(link_to_logbook_loan)
+    linked = can_link and wants_link
+    concession_applied = linked and concession_eligible
+    ipf_type = "linked" if linked else "unlinked"
 
     deposit_percentage = Decimal("0.00") if concession_applied else settings.deposit_percentage_standard
     interest_rate_monthly = settings.interest_rate_preferred_monthly if concession_applied else settings.interest_rate_standard_monthly
@@ -260,6 +276,8 @@ async def check_eligibility(
         "corporate_terms_applied": corporate_terms_applied,
         "ipf_type": ipf_type,
         "can_link_to_logbook_loan": can_link,
+        "concession_eligible": concession_eligible,
+        "existing_loan_max_months": existing_window,
         "rate_tier_applied": rate_tier is not None,
         "rate_tier_name": rate_tier.label if rate_tier is not None else None,
         "loan_application_fee_pct": loan_application_fee_pct if result.eligible else settings.loan_application_fee_pct,
@@ -641,6 +659,7 @@ async def get_financing_application_detail(db: AsyncSession, application_id: str
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Quote on this application no longer exists")
     provider = await db.get(InsuranceProvider, quote.provider_id)
     product = await db.get(InsuranceProduct, quote.product_id) if quote.product_id else None
+    quote_request = await db.get(QuoteRequest, quote.quote_request_id)
 
     documents = (
         await db.scalars(
@@ -687,7 +706,7 @@ async def get_financing_application_detail(db: AsyncSession, application_id: str
         quote=FinancingQuoteOut(
             id=quote.id,
             provider_name=provider.name if provider else "Unknown provider",
-            product_name=product.name if product else None,
+            product_name=_resolve_product_name(product, quote, quote_request.category if quote_request else None),
             premium=quote.premium,
             total=quote.total,
             currency=quote.currency,

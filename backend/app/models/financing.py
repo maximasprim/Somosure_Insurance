@@ -95,9 +95,10 @@ class FinancingApplication(Base):
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
 
     # --- IPF specifics (see ipf.py / ipf_service.py) -----------------------------
-    # "linked" = the client also has a Bidii Credit auto/logbook loan and the vehicle
-    # carries a tracker; "unlinked" = IPF on its own (deposit + post-dated cheques).
-    # Worked out from has_existing_logbook_loan when the request is made; staff can change it.
+    # "linked" = the client has a recent Bidii Credit logbook loan AND chose to link this
+    # financing to it (the vehicle carries a tracker); "unlinked" = IPF on its own (deposit +
+    # post-dated cheques) - including a client who has such a loan but chose not to link.
+    # Decided when the request is made (financing_service.check_eligibility); staff can change it.
     ipf_type: Mapped[str] = mapped_column(String(10), default="unlinked", server_default="unlinked")
     loan_officer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("loan_officers.id"))
     tracker_provider: Mapped[str | None] = mapped_column(String(80))
@@ -234,6 +235,10 @@ class FinancingSettings(Base):
     # How recent an existing Bidii Credit logbook loan must be for the
     # deposit/rate/fee concessions to apply at all.
     concession_loan_age_max_months: Mapped[int] = mapped_column(Integer, default=3)
+    # The oldest an existing Bidii Credit logbook loan can be and still be LINKED to this financing
+    # (it is still running). Beyond it the loan counts as finished. Never shorter than the concession
+    # window above, which is the shorter window for the deposit, rate and fee waivers.
+    existing_loan_max_months: Mapped[int] = mapped_column(Integer, default=10, server_default="10")
 
     # Whether a Bidii Credit financing request needs a staff decision. True (the
     # default): a new request waits as "submitted" until staff approve or reject it

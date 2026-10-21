@@ -158,7 +158,7 @@ async def _record_extracted_details(
 
 
 async def rescan_application_documents(db: AsyncSession, application_id: str) -> ApplicationRescanOut:
-    """Re-reads ID number / KRA PIN / logbook numbers from the documents already
+    """Re-reads ID number / KRA PIN / logbook numbers / valuation details from the documents already
     uploaded on this application - for applications that were submitted before
     automatic reading existed, or where a clearer copy has since been uploaded.
     Oldest first, so the newest upload wins. Never removes anything."""
@@ -178,7 +178,7 @@ async def rescan_application_documents(db: AsyncSession, application_id: str) ->
     ).all()
     if not docs:
         return ApplicationRescanOut(
-            documents_read=0, fields_found=[], message="No ID, KRA PIN or logbook documents have been uploaded yet."
+            documents_read=0, fields_found=[], message="No ID, KRA PIN, logbook or valuation documents have been uploaded yet."
         )
 
     storage = get_storage()
@@ -205,7 +205,7 @@ async def rescan_application_documents(db: AsyncSession, application_id: str) ->
     elif read == 0:
         message = "The uploaded files could not be opened for re-reading."
     else:
-        message = "No ID number, KRA PIN or logbook numbers could be read - the copies may be too blurry or image-only."
+        message = "No ID number, KRA PIN, logbook or valuation details could be read - the copies may be too blurry or image-only."
     return ApplicationRescanOut(documents_read=read, fields_found=sorted(found), message=message)
 
 

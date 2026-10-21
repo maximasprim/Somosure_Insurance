@@ -100,10 +100,14 @@ export const COMMISSION_LABELS: Record<OfficerCommission["status"], string> = {
 
 export const IPF_TYPE_HELP: Record<IpfDetail["ipf_type"], string> = {
   unlinked:
-    "Stand-alone IPF. The client pays the deposit and hands over one post-dated cheque for each monthly repayment.",
+    "Stand-alone IPF: no logbook loan, or the client has one but chose not to link this financing to it. They pay the deposit and hand over one post-dated cheque for each monthly repayment.",
   linked:
-    "The client also has a Bidii Credit auto loan. The vehicle carries a tracker and is held under that loan, so cheques aren't needed.",
+    "The client has a Bidii Credit logbook loan (within the existing-loan window) and chose to link this financing to it. The vehicle carries a tracker, so cheques aren't needed.",
 };
+
+// Shown beside the IPF type switch: changing the type changes the security needed, not the price already quoted.
+export const IPF_TYPE_CHANGE_NOTE =
+  "Changing the type changes which security is needed. The deposit, rate and fees were set when the client applied and are not recalculated.";
 
 export function formatDay(iso: string | null | undefined): string {
   if (!iso) return "-";

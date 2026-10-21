@@ -123,6 +123,109 @@ async def test_ipf_type_follows_the_existing_loan_and_decides_what_security_is_n
     assert changed.status_code == 200 and changed.json()["ipf_type"] == "unlinked" and changed.json()["cheques_required"] == 6
 
 
+async def test_having_a_logbook_loan_is_not_enough_the_client_must_also_choose_to_link(client, db_session, seeded_providers):
+    """Linked IPF = a recent Bidii Credit logbook loan AND choosing to link the financing to it."""
+    headers = await _staff(client, db_session)
+    customer, quote = await _customer_quote(db_session, seeded_providers[0], "0788300020")
+    base = {"customer_id": str(customer.id), "quote_id": str(quote.id), "term_months": 6, "has_existing_logbook_loan": True, "logbook_loan_age_months": 1}
+
+    # the choice left unanswered counts as linking - how it has always behaved
+    unanswered = (await client.post("/api/v1/financing/eligibility", json=base)).json()
+    assert unanswered["ipf_type"] == "linked" and unanswered["concession_applied"] is True
+    assert unanswered["can_link_to_logbook_loan"] is True and Decimal(str(unanswered["deposit_amount"])) == 0
+
+    # chose to link: no deposit, reduced terms, tracker instead of cheques
+    linked = (await client.post("/api/v1/financing/eligibility", json={**base, "link_to_logbook_loan": True})).json()
+    assert linked["ipf_type"] == "linked" and linked["concession_applied"] is True
+
+    # has the loan but chose NOT to link: standard deposit and rate, like anyone else
+    separate = (await client.post("/api/v1/financing/eligibility", json={**base, "link_to_logbook_loan": False})).json()
+    assert separate["ipf_type"] == "unlinked" and separate["concession_applied"] is False
+    assert separate["can_link_to_logbook_loan"] is True  # still offered the choice
+    assert Decimal(str(separate["deposit_amount"])) > 0
+    assert Decimal(str(separate["interest_rate_monthly"])) == Decimal(str(separate["standard_interest_rate_monthly"]))
+    assert Decimal(str(separate["total_repayable"])) > Decimal(str(linked["total_repayable"]))
+
+    # the application carries that decision, and with it the security that is needed
+    fin_separate = (await client.post("/api/v1/financing/applications", json={**base, "link_to_logbook_loan": False})).json()
+    assert fin_separate["ipf_type"] == "unlinked"
+    detail = (await client.get(f"{ADMIN}/applications/{fin_separate['id']}/ipf", headers=headers)).json()
+    assert detail["cheques_required"] == 6 and detail["tracker"]["required"] is False
+
+    customer2, quote2 = await _customer_quote(db_session, seeded_providers[0], "0788300021")
+    fin_linked = (await client.post("/api/v1/financing/applications", json={**base, "customer_id": str(customer2.id), "quote_id": str(quote2.id), "link_to_logbook_loan": True})).json()
+    assert fin_linked["ipf_type"] == "linked"
+    detail = (await client.get(f"{ADMIN}/applications/{fin_linked['id']}/ipf", headers=headers)).json()
+    assert detail["cheques_required"] == 0 and detail["tracker"]["required"] is True
+
+
+async def test_a_client_cannot_link_to_a_loan_they_do_not_have_or_one_that_is_too_old(client, db_session, seeded_providers):
+    customer, quote = await _customer_quote(db_session, seeded_providers[0], "0788300022")
+    base = {"customer_id": str(customer.id), "quote_id": str(quote.id), "term_months": 6}
+
+    no_loan = (await client.post("/api/v1/financing/eligibility", json={**base, "link_to_logbook_loan": True})).json()
+    assert no_loan["ipf_type"] == "unlinked" and no_loan["can_link_to_logbook_loan"] is False and no_loan["concession_applied"] is False
+
+    too_old = (
+        await client.post(
+            "/api/v1/financing/eligibility",
+            json={**base, "has_existing_logbook_loan": True, "logbook_loan_age_months": 24, "link_to_logbook_loan": True},
+        )
+    ).json()
+    assert too_old["ipf_type"] == "unlinked" and too_old["can_link_to_logbook_loan"] is False and too_old["concession_applied"] is False
+
+
+async def test_a_loan_can_be_linked_up_to_the_existing_loan_window_but_waivers_need_the_shorter_concession_window(
+    client, db_session, seeded_providers
+):
+    """Defaults: existing-loan window 10 months, concession window 3. A loan in between can be linked
+    (tracker, no cheques) but gets the standard deposit, rate and fees."""
+    headers = await _staff(client, db_session)
+    settings = (await client.get(f"{ADMIN}/settings", headers=headers)).json()
+    assert settings["existing_loan_max_months"] == 10 and settings["concession_loan_age_max_months"] == 3
+
+    customer, quote = await _customer_quote(db_session, seeded_providers[0], "0788300030")
+    base = {"customer_id": str(customer.id), "quote_id": str(quote.id), "term_months": 6, "has_existing_logbook_loan": True, "logbook_loan_age_months": 6}
+
+    # 6 months old: still within the 10-month window, past the 3-month concession window
+    unanswered = (await client.post("/api/v1/financing/eligibility", json=base)).json()
+    assert unanswered["can_link_to_logbook_loan"] is True and unanswered["concession_eligible"] is False
+    assert unanswered["ipf_type"] == "unlinked"  # left unanswered it behaves as it always did: no waivers, not linked
+    assert unanswered["existing_loan_max_months"] == 10
+
+    linked = (await client.post("/api/v1/financing/eligibility", json={**base, "link_to_logbook_loan": True})).json()
+    assert linked["ipf_type"] == "linked" and linked["concession_applied"] is False
+    assert Decimal(str(linked["deposit_amount"])) > 0  # the waivers don't apply
+    assert Decimal(str(linked["interest_rate_monthly"])) == Decimal(str(linked["standard_interest_rate_monthly"]))
+
+    fin = (await client.post("/api/v1/financing/applications", json={**base, "link_to_logbook_loan": True})).json()
+    assert fin["ipf_type"] == "linked"
+    detail = (await client.get(f"{ADMIN}/applications/{fin['id']}/ipf", headers=headers)).json()
+    assert detail["cheques_required"] == 0 and detail["tracker"]["required"] is True
+
+    # the window's edge: 10 months can still be linked, 11 cannot
+    edge = (await client.post("/api/v1/financing/eligibility", json={**base, "logbook_loan_age_months": 10, "link_to_logbook_loan": True})).json()
+    assert edge["can_link_to_logbook_loan"] is True and edge["ipf_type"] == "linked"
+    beyond = (await client.post("/api/v1/financing/eligibility", json={**base, "logbook_loan_age_months": 11, "link_to_logbook_loan": True})).json()
+    assert beyond["can_link_to_logbook_loan"] is False and beyond["ipf_type"] == "unlinked"
+
+
+async def test_the_existing_loan_window_is_a_setting_and_cannot_be_shorter_than_the_concession_window(client, db_session):
+    headers = await _staff(client, db_session)
+    url = f"{ADMIN}/settings"
+
+    changed = await client.patch(url, json={"existing_loan_max_months": 12}, headers=headers)
+    assert changed.status_code == 200 and changed.json()["existing_loan_max_months"] == 12
+
+    too_short = await client.patch(url, json={"existing_loan_max_months": 2}, headers=headers)  # concession window is 3
+    assert too_short.status_code == 400 and "shorter" in too_short.json()["detail"]
+    widened_past_it = await client.patch(url, json={"concession_loan_age_max_months": 15}, headers=headers)
+    assert widened_past_it.status_code == 400  # the concession window can't outgrow the existing-loan window either
+
+    kept = await client.patch(url, json={"existing_loan_max_months": None}, headers=headers)
+    assert kept.status_code == 200 and kept.json()["existing_loan_max_months"] == 12  # can be changed, never cleared
+
+
 async def test_the_tracker_needs_its_details_and_the_original_logbook_can_be_marked_received(client, db_session, seeded_providers):
     headers = await _staff(client, db_session)
     customer, quote = await _customer_quote(db_session, seeded_providers[0], "0788300004")

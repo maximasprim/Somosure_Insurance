@@ -183,3 +183,57 @@ def test_a_pdf_of_the_wrong_document_names_what_it_looks_like():
     id_pdf = _pdf(["REPUBLIC OF KENYA", "IDENTITY CARD", "ID NUMBER 12345678"])
     result = validate_document("logbook", "id.pdf", id_pdf)
     assert not result.ok and "looks like a National ID" in result.message
+
+# --- valuation report ----------------------------------------------------------
+
+VALUATION_LINES = [
+    "BANK VALUATION REPORT FOR STATION WAGON KAA 123B",
+    "REGISTRATION NO KAA 123B MAKE & MODEL TOYOTA FIELDER",
+    "CHASSIS NO. NZE-1234567 ENGINE NO 1NZ9876543",
+    "MARKET VALUE KES 420,000",
+    "FORCED VALUE KES 360,000",
+    "Pin NO : P000000001X",
+]
+
+
+def test_a_valuation_report_is_recognised_and_not_mistaken_for_other_documents():
+    pdf = _pdf(VALUATION_LINES)
+    ok = validate_document("valuation_report", "v.pdf", pdf)
+    assert ok.ok and ok.verified
+
+    # It prints a chassis/engine/registration number like a logbook, and the valuer's own
+    # PIN like a KRA certificate - neither slot may accept it.
+    as_logbook = validate_document("logbook", "v.pdf", pdf)
+    assert not as_logbook.ok and "valuation report" in as_logbook.message
+    as_kra = validate_document("kra_pin", "v.pdf", pdf)
+    assert not as_kra.ok and "valuation report" in as_kra.message
+    assert not validate_document("national_id", "v.pdf", pdf).ok
+
+
+def test_a_logbook_is_refused_in_the_valuation_slot():
+    logbook = _pdf(["THE TRAFFIC ACT", "MOTOR VEHICLE LOG BOOK", "Registration No KDA 123X", "Chassis No ABC123"])
+    result = validate_document("valuation_report", "lb.pdf", logbook)
+    assert not result.ok and "looks like a vehicle logbook" in result.message
+
+
+def _encrypted(pdf: bytes, user_password: str) -> bytes:
+    from pypdf import PdfReader, PdfWriter
+
+    writer = PdfWriter()
+    for page in PdfReader(io.BytesIO(pdf)).pages:
+        writer.add_page(page)
+    writer.encrypt(user_password=user_password, owner_password="owner-secret")
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue() + b"\n%" + b"padding" * 800
+
+
+def test_a_pdf_with_only_an_owner_password_opens_but_a_locked_one_is_refused():
+    pytest.importorskip("pypdf")
+    # Valuers and banks commonly restrict copying/editing with an owner password; the file
+    # still opens with a blank password and must be accepted.
+    open_pdf = _encrypted(render_text_pdf("Document", VALUATION_LINES + PADDING), "")
+    assert validate_document("valuation_report", "v.pdf", open_pdf).ok
+    # A real user password can't be opened, so it is still refused.
+    locked = validate_document("valuation_report", "v.pdf", _encrypted(render_text_pdf("Document", VALUATION_LINES + PADDING), "secret"))
+    assert not locked.ok and "password-protected" in locked.message

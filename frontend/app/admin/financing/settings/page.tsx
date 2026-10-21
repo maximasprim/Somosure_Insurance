@@ -33,6 +33,12 @@ const FIELDS: { key: keyof FormState; label: string; hint?: string; suffix?: str
     hint: "How recent an existing Bidii Credit logbook loan must be for the deposit, rate, and fee waivers to apply.",
   },
   {
+    key: "existing_loan_max_months",
+    label: "Existing-loan max window",
+    suffix: "months",
+    hint: "The oldest an existing Bidii Credit logbook loan can be and still be linked to this financing - beyond it the loan counts as finished. Can't be shorter than the concession window above. Default 10.",
+  },
+  {
     key: "corporate_deposit_percentage",
     label: "Company applicant deposit (optional)",
     suffix: "%",
@@ -57,6 +63,7 @@ function toFormState(s: FinancingSettings): FormState {
     life_insurance_fee_pct: s.life_insurance_fee_pct,
     excise_duty_pct: s.excise_duty_pct,
     concession_loan_age_max_months: String(s.concession_loan_age_max_months),
+    existing_loan_max_months: String(s.existing_loan_max_months ?? 10),
     corporate_deposit_percentage: s.corporate_deposit_percentage ?? "",
     corporate_interest_rate_monthly: s.corporate_interest_rate_monthly ?? "",
   };
@@ -98,6 +105,7 @@ export default function FinancingSettingsPage() {
         life_insurance_fee_pct: form.life_insurance_fee_pct,
         excise_duty_pct: form.excise_duty_pct,
         concession_loan_age_max_months: Number(form.concession_loan_age_max_months),
+        existing_loan_max_months: Number(form.existing_loan_max_months),
         // Blank = "same as standard" (null clears any value set earlier).
         corporate_deposit_percentage: form.corporate_deposit_percentage.trim() === "" ? null : form.corporate_deposit_percentage,
         corporate_interest_rate_monthly: form.corporate_interest_rate_monthly.trim() === "" ? null : form.corporate_interest_rate_monthly,

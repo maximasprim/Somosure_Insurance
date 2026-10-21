@@ -168,7 +168,7 @@ export function FinancingOption({
     <Card className="flex flex-col gap-4 border-brand-deep/30">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Finance this premium with Bidii Credit</h3>
-        {eligibility?.is_mock && <Badge tone="neutral">Demo eligibility check</Badge>}
+        {/* {eligibility?.is_mock && <Badge tone="neutral">Demo eligibility check</Badge>} */}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -217,11 +217,13 @@ export function FinancingOption({
                   }.`
                 : eligibility?.concession_applied
                 ? "Great - your existing-customer terms are applied below."
-                : eligibility?.can_link_to_logbook_loan
+                : eligibility?.can_link_to_logbook_loan && !linkToLoan
                 ? "You chose to keep this financing separate, so the standard deposit and rate apply."
-                : `Reduced terms only apply to a loan taken within the last ${
-                    eligibility?.concession_loan_age_max_months ?? "few"
-                  } months - standard terms apply for now.`}
+                : eligibility?.can_link_to_logbook_loan
+                ? `Your loan is linked, but it is older than ${
+                    eligibility.concession_loan_age_max_months ?? "a few"
+                  } months, so the standard deposit, rate and fees still apply.`
+                : `A loan older than ${eligibility?.existing_loan_max_months ?? 10} months can't be linked - standard terms apply.`}
             </p>
 
             {eligibility?.can_link_to_logbook_loan && (
@@ -230,7 +232,10 @@ export function FinancingOption({
                 <label className="mt-1.5 flex items-start gap-2 text-xs text-ink-soft">
                   <input type="radio" name="link-to-loan" className="mt-0.5" checked={linkToLoan} onChange={() => changeLink(true)} />
                   <span>
-                    <span className="font-medium text-ink">Yes, link it</span> - no deposit, plus your reduced rate and fees. Your vehicle will carry a tracker.
+                    <span className="font-medium text-ink">Yes, link it</span> -{" "}
+                    {eligibility.concession_eligible
+                      ? "no deposit, plus your reduced rate and fees. Your vehicle will carry a tracker."
+                      : "your vehicle will carry a tracker instead of post-dated cheques. Your loan is older than the reduced-terms period, so the standard deposit, rate and fees still apply."}
                   </span>
                 </label>
                 <label className="mt-1.5 flex items-start gap-2 text-xs text-ink-soft">

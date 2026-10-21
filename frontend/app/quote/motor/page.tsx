@@ -34,6 +34,8 @@ export default function MotorQuotePage() {
   const [application, setApplication] = useState<ApplicationResult | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<NormalizedQuote | null>(null);
   const [customerId, setCustomerId] = useState(GUEST_CUSTOMER_ID);
+  // What the customer chose on the form - decides whether a valuation report is asked for.
+  const [chosenCoverType, setChosenCoverType] = useState<string | undefined>(undefined);
 
   // Save-and-resume (see lib/quoteSession.ts). Saved only up to "awaiting
   // approval"; reaching payment clears it so a paid customer is never
@@ -84,6 +86,7 @@ export default function MotorQuotePage() {
         referral_code: getStoredReferral(),
       });
       setResult(res);
+      setChosenCoverType(values.cover_type);
       // The backend resolves (or creates) a real guest Customer from the
       // form's owner_phone/owner_name and returns its id here - without
       // reading it back, a guest application would be created against the
@@ -118,6 +121,17 @@ export default function MotorQuotePage() {
       setSubmitting(false);
     }
   }
+
+  // What the quotes were actually priced as wins (a car too old for comprehensive is quoted as
+  // third-party); the form's choice is the fallback, and also covers a resumed session.
+  const pricedCoverTypes = (result?.quotes ?? [])
+    .map((q) => q.provider_metadata?.["cover_type"])
+    .filter((c): c is string => typeof c === "string");
+  const checklistCoverType = pricedCoverTypes.length
+    ? pricedCoverTypes.includes("comprehensive")
+      ? "comprehensive"
+      : pricedCoverTypes[0]
+    : chosenCoverType;
 
   const stepIndex = {
     form: 0,
@@ -156,7 +170,7 @@ export default function MotorQuotePage() {
 
       {step === "compare" && result && (
         <div className="flex flex-col gap-6">
-          {result.quotes.length > 0 && <DocumentChecklistCard category="motor" />}
+          {result.quotes.length > 0 && <DocumentChecklistCard category="motor" coverType={checklistCoverType} />}
           <QuoteComparison quotes={result.quotes} note={result.note} onSelect={handleSelectQuote} />
         </div>
       )}

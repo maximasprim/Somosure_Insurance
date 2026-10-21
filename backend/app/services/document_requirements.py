@@ -33,6 +33,12 @@ class DocumentSpec:
     # Regexes that, if matched anywhere in the text, count as a hit on
     # their own (e.g. the shape of a KRA PIN).
     patterns: tuple[str, ...] = field(default=(), repr=False)
+    # Phrases that mean "this is NOT a document of this type" even if enough of
+    # the keywords above are present. Needed where two documents share words -
+    # a valuation report prints a chassis number, engine number and registration
+    # number just like a logbook does, so without this it would be accepted in
+    # the logbook slot.
+    excluded_phrases: tuple[str, ...] = field(default=(), repr=False)
 
 
 NATIONAL_ID = DocumentSpec(
@@ -72,6 +78,27 @@ LOGBOOK = DocumentSpec(
         ("ntsa", "national transport and safety", "traffic act", "tims", "ecitizen"),
     ),
     min_hits=2,
+    excluded_phrases=("valuation report", "market value", "forced value"),
+)
+
+VALUATION_REPORT = DocumentSpec(
+    type="valuation_report",
+    label="Vehicle valuation report",
+    description=(
+        "A valuation report for the vehicle from a motor valuer (for example the one done for a bank or financier). "
+        "Comprehensive cover is priced on what the vehicle is worth, so we need it to confirm the value insured."
+    ),
+    tips=(
+        "It must show the vehicle's market value and registration number.",
+        "Upload the whole report as one PDF - the pages with the vehicle photos are fine to include.",
+    ),
+    keyword_groups=(
+        ("valuation report", "valuation certificate", "bank valuation", "valuers", "valuer"),
+        ("market value",),
+        ("forced value", "forced sale value", "forced sale"),
+        ("registration no", "registration number", "reg no"),
+    ),
+    min_hits=2,
 )
 
 KRA_PIN = DocumentSpec(
@@ -85,6 +112,10 @@ KRA_PIN = DocumentSpec(
     ),
     min_hits=1,
     patterns=(r"\b[AP]\d{9}[A-Z]\b",),
+    # A valuer's report prints the VALUER's own KRA PIN in its footer, which has the
+    # shape of a PIN - without this it would be accepted as the customer's certificate
+    # and that PIN read off as theirs.
+    excluded_phrases=("valuation report", "market value", "forced value"),
 )
 
 CERTIFICATE_OF_INCORPORATION = DocumentSpec(
@@ -131,7 +162,7 @@ PREMIUM_QUOTE = DocumentSpec(
 
 SPECS: dict[str, DocumentSpec] = {
     s.type: s
-    for s in (NATIONAL_ID, LOGBOOK, KRA_PIN, CERTIFICATE_OF_INCORPORATION, PROPERTY_PROOF, APPLICATION_FORM, PREMIUM_QUOTE)
+    for s in (NATIONAL_ID, LOGBOOK, VALUATION_REPORT, KRA_PIN, CERTIFICATE_OF_INCORPORATION, PROPERTY_PROOF, APPLICATION_FORM, PREMIUM_QUOTE)
 }
 
 # Document types the platform itself produces for the customer, so they are
@@ -143,14 +174,35 @@ SYSTEM_PROVIDED_TYPES = {"premium_quote"}
 REUSABLE_ACROSS_APPLICATIONS = {"national_id", "kra_pin", "certificate_of_incorporation"}
 
 
-def insurance_documents(category: str) -> list[DocumentSpec]:
+def is_comprehensive(cover_type: str | None) -> bool:
+    return str(cover_type or "").strip().lower() == "comprehensive"
+
+
+def quote_cover_type(provider_metadata: dict | None, answers: dict | None) -> str | None:
+    """The cover type a quote is actually for. A rate-card quote records what it
+    was priced as (it can differ from what was asked: a car too old for
+    comprehensive is quoted as third-party), so that wins; otherwise what the
+    customer chose on the quote form."""
+    priced = (provider_metadata or {}).get("cover_type")
+    if priced:
+        return str(priced).strip().lower()
+    asked = (answers or {}).get("cover_type")
+    return str(asked).strip().lower() if asked else None
+
+
+def insurance_documents(category: str, cover_type: str | None = None) -> list[DocumentSpec]:
     """Documents needed for the insurance application itself.
 
-    Motor needs the vehicle logbook; every other category only needs
-    identity and tax documents (asking for a logbook on a medical or
-    travel policy makes no sense)."""
+    Motor needs the vehicle logbook, and - for comprehensive cover only - a
+    valuation report (third-party cover doesn't depend on the vehicle's value).
+    Every other category only needs identity and tax documents (asking for a
+    logbook on a medical or travel policy makes no sense)."""
     if category == "motor":
-        return [NATIONAL_ID, LOGBOOK, KRA_PIN]
+        docs = [NATIONAL_ID, LOGBOOK]
+        if is_comprehensive(cover_type):
+            docs.append(VALUATION_REPORT)
+        docs.append(KRA_PIN)
+        return docs
     if category == "property":
         return [NATIONAL_ID, PROPERTY_PROOF, KRA_PIN]
     return [NATIONAL_ID, KRA_PIN]
@@ -179,7 +231,7 @@ def spec_to_dict(spec: DocumentSpec) -> dict:
     }
 
 
-def requirements_payload(category: str, is_corporate: bool = False) -> dict:
+def requirements_payload(category: str, is_corporate: bool = False, cover_type: str | None = None) -> dict:
     """The JSON the frontend shows on the 'have these ready' card."""
     return {
         "category": category,
@@ -190,7 +242,7 @@ def requirements_payload(category: str, is_corporate: bool = False) -> dict:
             "One document per file. Don't combine different documents into a single upload.",
             "Documents are checked on upload, so a blurry, blank or wrong file will be flagged straight away.",
         ],
-        "insurance": [spec_to_dict(s) for s in insurance_documents(category)],
+        "insurance": [spec_to_dict(s) for s in insurance_documents(category, cover_type)],
         "financing": {
             "note": (
                 "Only needed if you choose Bidii Credit financing. Anything you've already uploaded for your "

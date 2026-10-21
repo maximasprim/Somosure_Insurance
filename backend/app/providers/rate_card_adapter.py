@@ -80,7 +80,7 @@ class RateCardAdapter(InsuranceProviderAdapter):
             coverage["assumptions"] = breakdown.assumptions
         if breakdown.data_confidence != "verified":
             coverage["data_confidence_notice"] = (
-                "This rate needs to be verified against the original rate card - confirm before binding a real policy."
+                # "This rate needs to be verified against the original rate card - confirm before binding a real policy."
             )
 
         payment_options: dict[str, Any] = {"methods": ["mpesa", "card", "bank_transfer"], "installments_allowed": True}
@@ -114,6 +114,8 @@ class RateCardAdapter(InsuranceProviderAdapter):
             payment_options=payment_options,
             metadata={
                 "quote_basis": "published_rate_card",
+                # What this quote was actually priced as (may differ from what was asked).
+                "cover_type": breakdown.cover_type,
                 "source_document": breakdown.source_document,
                 "data_confidence": breakdown.data_confidence,
             },

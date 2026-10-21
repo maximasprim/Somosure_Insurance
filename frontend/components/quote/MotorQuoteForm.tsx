@@ -33,6 +33,8 @@ export const motorQuoteSchema = z.object({
   seating_capacity: z.coerce.number().int().positive().optional(),
   owner_name: z.string().min(2, "Enter the owner's full name"),
   owner_phone: z.string().min(10, "Enter a valid phone number"),
+  // Optional: saved on the customer record. Blank is fine; anything else must look like an email.
+  owner_email: z.union([z.literal(""), z.string().email("Enter a valid email address")]).optional(),
   extensions: z.array(z.string()).optional(),
 });
 
@@ -315,6 +317,7 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
       
       <Input label="Owner's full name" {...register("owner_name")} error={errors.owner_name?.message} />
       <Input label="Owner's phone" placeholder="07XX XXX XXX" {...register("owner_phone")} error={errors.owner_phone?.message} />
+      <Input label="Owner's email (optional)" type="email" placeholder="you@gmail.com" {...register("owner_email")} error={errors.owner_email?.message} />
 
       <div className="sm:col-span-2">
         <Button type="submit" size="lg" disabled={submitting} className="w-full sm:w-auto">

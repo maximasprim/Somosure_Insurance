@@ -17,13 +17,16 @@ import type { DocumentRequirement, DocumentRequirements } from "@/lib/types";
  * Purely informational: if the request fails it renders nothing, so it can
  * never block the quote flow.
  */
-export function DocumentChecklistCard({ category }: { category: string }) {
+export function DocumentChecklistCard({ category, coverType }: { category: string; coverType?: string }) {
   const [reqs, setReqs] = useState<DocumentRequirements | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     api
-      .get<DocumentRequirements>(`/api/v1/quotes/document-requirements?category=${encodeURIComponent(category)}`)
+      .get<DocumentRequirements>(
+        `/api/v1/quotes/document-requirements?category=${encodeURIComponent(category)}` +
+          (coverType ? `&cover_type=${encodeURIComponent(coverType)}` : "")
+      )
       .then((res) => {
         if (!cancelled) setReqs(res);
       })
@@ -33,7 +36,7 @@ export function DocumentChecklistCard({ category }: { category: string }) {
     return () => {
       cancelled = true;
     };
-  }, [category]);
+  }, [category, coverType]);
 
   if (!reqs) return null;
 

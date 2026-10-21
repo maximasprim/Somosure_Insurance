@@ -12,6 +12,9 @@ class EligibilityRequest(BaseModel):
     has_existing_logbook_loan: bool = False
     logbook_loan_age_months: int | None = None
     is_corporate: bool = False
+    # Whether to link this financing to that logbook loan ("linked" IPF). Only meaningful when
+    # the loan is recent enough; leave it out and it counts as yes, as it always has.
+    link_to_logbook_loan: bool | None = None
     # Waives the deposit, applies the preferred interest rate, and waives
     # the three fees below - but only when has_existing_logbook_loan is
     # True AND logbook_loan_age_months is within the configured window
@@ -20,6 +23,16 @@ class EligibilityRequest(BaseModel):
 
 
 class EligibilityOut(BaseModel):
+    # linked = has a recent Bidii Credit logbook loan AND chose to link; otherwise unlinked.
+    ipf_type: str = "unlinked"
+    # True when the client's loan is young enough (within existing_loan_max_months) to be OFFERED the choice to link.
+    can_link_to_logbook_loan: bool = False
+    # True when it is also recent enough (within the concession window) for the deposit, rate and fee waivers.
+    concession_eligible: bool = False
+    existing_loan_max_months: int | None = None
+    # Set when a staff-defined pricing tier (by loan size and term) decided the rate.
+    rate_tier_applied: bool = False
+    rate_tier_name: str | None = None
     eligible: bool
     reason: str | None
     total_premium: Decimal
@@ -58,6 +71,8 @@ class FinancingApplicationCreate(BaseModel):
     # instead of a personal ID in the documents checklist.
     # Optional Bidii loan officer code - credits the sale to that officer.
     loan_officer_code: str | None = None
+    # Link this financing to their Bidii Credit logbook loan? (see EligibilityRequest)
+    link_to_logbook_loan: bool | None = None
 
 
 class FinancingApplicationOut(BaseModel):
@@ -213,6 +228,7 @@ class FinancingSettingsOut(BaseModel):
     corporate_deposit_percentage: Decimal | None = None
     corporate_interest_rate_monthly: Decimal | None = None
     require_staff_approval: bool = True
+    existing_loan_max_months: int = 10
     early_settlement_fee_pct: Decimal = Decimal("3.50")
     loan_officer_commission_pct: Decimal = Decimal("10.00")
     somosure_commission_pct_of_premium: Decimal | None = None
@@ -241,6 +257,9 @@ class FinancingSettingsUpdate(BaseModel):
     # true = staff approve each financing request; false = the credit provider's instant decision stands.
     # (Sending null is ignored - it can only be true or false.)
     require_staff_approval: bool | None = None
+    # The oldest an existing logbook loan can be and still be linked to this financing (months).
+    # Must not be shorter than the concession window. Sending null is ignored.
+    existing_loan_max_months: int | None = Field(default=None, ge=1, le=60)
     # Fee for clearing a loan early, as a % of the principal still outstanding.
     early_settlement_fee_pct: Decimal | None = Field(default=None, ge=0, le=100)
     # A loan officer's share of Somosure's net commission on a policy they financed.

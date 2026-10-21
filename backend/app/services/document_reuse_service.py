@@ -44,6 +44,7 @@ from app.services.document_requirements import (
     DocumentSpec,
     financing_documents,
     insurance_documents,
+    quote_cover_type,
 )
 from app.services.simple_pdf import render_text_pdf
 
@@ -314,7 +315,9 @@ async def application_checklist(
     quote = await db.get(Quote, app.quote_id)
     request = await db.get(QuoteRequest, quote.quote_request_id) if quote else None
     category = request.category if request else "motor"
-    specs = insurance_documents(category)
+    # Comprehensive motor cover also needs a valuation report.
+    cover_type = quote_cover_type(quote.provider_metadata if quote else None, request.input_data if request else None)
+    specs = insurance_documents(category, cover_type)
 
     async def own_docs() -> dict[str, ApplicationDocument]:
         rows = (

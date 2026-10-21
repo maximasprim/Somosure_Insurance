@@ -102,7 +102,7 @@ async def category_availability(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/document-requirements")
-async def document_requirements(category: str = "motor", corporate: bool = False):
+async def document_requirements(category: str = "motor", corporate: bool = False, cover_type: str | None = None):
     """The documents a customer should have ready as softcopies - shown
     right after quotes are generated, before they start an application."""
-    return requirements_payload(normalize_category(category), corporate)
+    return requirements_payload(normalize_category(category), corporate, cover_type)

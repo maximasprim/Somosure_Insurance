@@ -302,6 +302,9 @@ export interface EligibilityResult {
   ipf_type?: "linked" | "unlinked" | string;
   // True when their loan is recent enough that they are offered the choice to link.
   can_link_to_logbook_loan?: boolean;
+  // True when the loan is also recent enough (within the concession window) for the waivers.
+  concession_eligible?: boolean;
+  existing_loan_max_months?: number | null;
   eligible: boolean;
   reason: string | null;
   total_premium: string;
@@ -450,6 +453,8 @@ export interface FinancingSettings {
   life_insurance_fee_pct: string;
   excise_duty_pct: string;
   concession_loan_age_max_months: number;
+  // The oldest an existing logbook loan can be and still be linked to this financing (months).
+  existing_loan_max_months: number;
   corporate_deposit_percentage?: string | null;
   corporate_interest_rate_monthly?: string | null;
   updated_at: string;

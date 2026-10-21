@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import random
+import re
 import string
 from datetime import date
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +26,21 @@ def generate_reference() -> str:
     return f"SOM-{year}-{suffix}"
 
 
+_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def clean_email(value) -> str | None:
+    """The email a customer typed on a quote form, ready to store - or None if they left it blank.
+    A blank is fine (it is optional); something that is not an email address is refused with a
+    clear message rather than being quietly dropped."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    email = value.strip()
+    if len(email) > 255 or not _EMAIL_PATTERN.match(email):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Enter a valid email address")
+    return email.lower()
+
+
 async def resolve_customer(db: AsyncSession, customer_id: str | None, answers: dict) -> Customer | None:
     """Resolves the customer behind a quote request.
 
@@ -42,6 +59,8 @@ async def resolve_customer(db: AsyncSession, customer_id: str | None, answers: d
 
     phone = answers.get("owner_phone") or answers.get("phone")
     name = answers.get("owner_name") or answers.get("full_name")
+    # Optional. Saved on the customer record so staff have it (and can write to them).
+    email = clean_email(answers.get("owner_email") or answers.get("email"))
     if not phone:
         return None
 
@@ -50,9 +69,11 @@ async def resolve_customer(db: AsyncSession, customer_id: str | None, answers: d
     # become several customers. Stored numbers are never rewritten.
     guest = await db.scalar(select(Customer).where(Customer.phone.in_(phone_variants(phone))).order_by(Customer.created_at.asc()))
     if guest:
+        if email and not guest.email:  # fill a gap, never overwrite an email we already hold
+            guest.email = email
         return guest
 
-    guest = Customer(full_name=name or "Guest", phone=phone, lead_source="website")
+    guest = Customer(full_name=name or "Guest", phone=phone, email=email, lead_source="website")
     db.add(guest)
     await db.flush()
     return guest
