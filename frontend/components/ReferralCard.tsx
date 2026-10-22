@@ -28,7 +28,7 @@ export function ReferralCard() {
 
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-semibold">Refer a friend</h2>
+      <h2 className="text-sm font-semibold text-ink">Refer a friend</h2>
       <Card className="mt-3 flex items-center justify-between">
         <div>
           <p className="text-sm text-ink-soft">Share your code - they get help getting covered, you get rewarded.</p>

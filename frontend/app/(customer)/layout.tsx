@@ -1,5 +1,6 @@
 import { AppNav } from "@/components/AppNav";
 import { AuthGuard } from "@/components/AuthGuard";
+import { Footer } from "@/components/Footer";
 
 /**
  * Shared shell for the logged-in customer area. (customer) is a Next.js
@@ -13,6 +14,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
       <div className="min-h-screen bg-white">
         <AppNav />
         {children}
+        < Footer />
       </div>
     </AuthGuard>
   );

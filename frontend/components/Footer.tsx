@@ -47,7 +47,7 @@ const COLUMNS = [
 export function Footer() {
   return (
     <footer className="border-t border-neutral-border bg-neutral">
-      <div className="mx-auto max-w-8xl px-2 py-2 mt-12 md:px-4">
+      <div className="mx-auto max-w-8xl px-2 py-2 mt-8 md:px-4">
         <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-5">
           <div className="relative items-center justify-center sm:col-span-2 md:col-span-1">
             <div className="relative inline-block">
@@ -91,7 +91,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-6 flex flex-col items-start justify-between gap-4 border-t border-neutral-border pt-6 text-xs text-ink-soft sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col items-start justify-between gap-4 border-t border-neutral-border pt-4 text-xs text-ink-soft sm:flex-row sm:items-center">
           <p>© {new Date().getFullYear()} Somosure Insurance. All rights reserved.</p>
           <p>Nairobi, Kenya</p>
         </div>
