@@ -307,6 +307,25 @@ def test_valuation_report_values_and_condition_are_read():
     assert set(found) <= set(de.VALUATION_FIELDS)
 
 
+def test_valuation_nb_and_remedy_of_none_are_not_recorded():
+    found = de.extract_fields("valuation_report", "\n".join(VALUATION_PAGE_1 + VALUATION_PAGE_2))
+    assert "valuation_nb" not in found
+    assert "valuation_remedy" not in found
+    assert found["valuation_remarks"] == "Credit worthy"
+    assert found["valuation_assessed_on"] == "2026-10-16"
+
+
+def test_valuation_nb_and_remedy_are_read_when_the_valuer_writes_something():
+    page = "\n".join(VALUATION_PAGE_1 + VALUATION_PAGE_2)
+    page = page.replace("NB: NONE", "NB: REAR BUMPER REPAIRED,\nPAINT MISMATCH").replace("REMEDY: NONE", "REMEDY: REPAINT BEFORE COVER STARTS")
+    found = de.extract_fields("valuation_report", page)
+    assert found["valuation_nb"] == "REAR BUMPER REPAIRED, PAINT MISMATCH"
+    assert found["valuation_remedy"] == "REPAINT BEFORE COVER STARTS"
+    assert found["valuation_remarks"] == "Credit worthy"
+    assert found["valuation_assessed_on"] == "2026-10-16"
+    assert found["valuation_market_value"] == "420000"
+
+
 def test_valuation_market_value_falls_back_to_the_page_header_figures():
     text = "KAA 123B MV 420000 FV 360000 BIDII\nREGISTRATION NO KAA 123B"
     found = de.extract_fields("valuation_report", text)

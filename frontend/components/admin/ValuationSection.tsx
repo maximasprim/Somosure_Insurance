@@ -76,7 +76,7 @@ export function ValuationSection({
   const status = ["valuation_general_condition", "valuation_accident_repairs", "valuation_chassis_frame_damage"].filter((k) =>
     has(details, k)
   );
-  const notes = VALUATION_CONDITION_KEYS.filter((k) => ["valuation_coachwork", "valuation_remarks"].includes(k) && has(details, k));
+  const notes = VALUATION_CONDITION_KEYS.filter((k) => ["valuation_coachwork", "valuation_remarks", "valuation_nb", "valuation_remedy"].includes(k) && has(details, k));
 
   return (
     <section className="mt-8 border-t border-neutral-border/60 pt-6" aria-label="Valuation report">

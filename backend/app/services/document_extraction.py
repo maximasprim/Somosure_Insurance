@@ -112,6 +112,8 @@ VALUATION_FIELDS: tuple[str, ...] = (
     "valuation_accident_repairs",
     "valuation_chassis_frame_damage",
     "valuation_remarks",
+    "valuation_nb",
+    "valuation_remedy",
     "valuation_client",
     "valuation_valuer",
     "valuation_inspected_at",
@@ -326,12 +328,13 @@ _VAL_LABELS: tuple[tuple[str, str], ...] = (
 _VAL_LABEL_RES = [(key, re.compile(rx, re.I)) for key, rx in _VAL_LABELS]
 
 # Labels whose value may run over several lines. Every other value is one line.
-_VAL_MULTILINE = {"extras", "remarks", "coachwork"}
-_VAL_MAX_LEN = {"extras": 600, "coachwork": 500, "remarks": 300}
+_VAL_MULTILINE = {"extras", "remarks", "coachwork", "nb", "remedy"}
+_VAL_MAX_LEN = {"extras": 600, "coachwork": 500, "remarks": 300, "nb": 300, "remedy": 300}
 
 _MONEY = re.compile(r"(?:KES|KSH?S?\.?)?\s*([0-9][0-9,]{2,}(?:\.[0-9]{1,2})?)", re.I)
 _ACCIDENT_REPAIRS = re.compile(r"ACCIDENT\s+REPAIRS\s+ON\s+RADIATOR\s*/\s*INNER\s+VALANCES\s*\?\s*(YES|NO)\b", re.I)
 _FRAME_DAMAGE = re.compile(r"CROSS\s*MEMBER\s*/\s*CHASSIS\s+FRAME\s+DAMAGE\s*\??\s*(YES|NO)\b", re.I)
+_NO_NOTE = {"NONE", "NIL", "N/A", "NA", "NO", "NOT APPLICABLE"}
 # Printed in the page header of every page of these reports: "... MV 420000 FV 360000 ...".
 _MV_FV_HEADER = re.compile(r"\bMV\s*([0-9]{4,9})\s*FV\s*([0-9]{4,9})\b")
 _ISO_DATE = re.compile(r"\b(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})\b")
@@ -444,6 +447,10 @@ def extract_valuation_fields(text: str) -> dict[str, str]:
         if m:
             out[field] = m.group(1).capitalize()
     put("valuation_remarks", _clean(sec.get("remarks", ""), 300) or None)
+    # "NB: NONE" / "REMEDY: NONE" is the valuer saying there is nothing to flag - not worth showing.
+    for field, key in (("valuation_nb", "nb"), ("valuation_remedy", "remedy")):
+        note = _clean(sec.get(key, ""), 300)
+        put(field, note if note and note.upper().strip(". ") not in _NO_NOTE else None)
 
     # Who and when.
     put("valuation_client", _clean(sec.get("client", ""), 80).title() or None)

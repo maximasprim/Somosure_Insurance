@@ -76,6 +76,8 @@ const LABELS: Record<string, string> = {
   valuation_chassis_frame_damage: "Chassis / crossmember damage",
   valuation_coachwork: "Coachwork notes",
   valuation_remarks: "Valuer's remarks",
+  valuation_nb: "Valuer's note (NB)",
+  valuation_remedy: "Remedy",
 };
 
 /** Keys whose number is a Kenya-shilling amount. */
@@ -154,6 +156,8 @@ export const VALUATION_CONDITION_KEYS = [
   "valuation_chassis_frame_damage",
   "valuation_coachwork",
   "valuation_remarks",
+  "valuation_nb",
+  "valuation_remedy",
 ];
 export const ALL_VALUATION_KEYS = [...VALUATION_KEYS, ...VALUATION_VEHICLE_KEYS, ...VALUATION_CONDITION_KEYS];
 
