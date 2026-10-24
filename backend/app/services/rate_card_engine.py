@@ -175,6 +175,9 @@ class RateCardQuoteBreakdown:
     stamp_duty: Decimal = Decimal("0")
     total: Decimal = Decimal("0")
     excesses: list[dict[str, Any]] = field(default_factory=list)
+    # Every add-on this provider offers for this vehicle, priced for it, so the customer can tick
+    # what they want on the quote page. Display only - the quote's own price uses `extensions`.
+    optional_extensions: list[dict[str, Any]] = field(default_factory=list)
     free_benefits: list[dict[str, Any]] = field(default_factory=list)
     payment_plans: list[dict[str, Any]] = field(default_factory=list)
     data_confidence: str = "verified"
@@ -294,6 +297,41 @@ async def compute_motor_premium(
                 entry["limit_label"] = ext.limit_label or f"Up to KES {ext.limit_amount:,.0f}"
             extensions_breakdown.append(entry)
 
+    # What else this provider offers for this class, priced for THIS vehicle (display only). Same
+    # class-override-beats-provider-wide convention as above.
+    offered_rows = (
+        await db.scalars(select(RateCardExtension).where(RateCardExtension.provider_id == provider_id))
+    ).all()
+    offered_by_code: dict[str, RateCardExtension] = {}
+    for row in offered_rows:
+        if row.vehicle_class_id == vehicle_class.id or row.vehicle_class_id is None:
+            if row.code not in offered_by_code or row.vehicle_class_id == vehicle_class.id:
+                offered_by_code[row.code] = row
+    chosen_codes = {e["code"] for e in extensions_breakdown}
+    optional_extensions: list[dict[str, Any]] = []
+    for code, ext in sorted(offered_by_code.items(), key=lambda kv: kv[1].label):
+        is_excess_protector = code.startswith("excess_protector")
+        if is_excess_protector and cover_type == "tpo":
+            continue  # nothing to protect on a Third Party Only quote
+        offered_amount = motor_terms.extension_amount(
+            basis=ext.basis,
+            rate_percent=ext.rate_percent,
+            flat_amount=ext.flat_amount,
+            min_amount=ext.min_amount,
+            sum_insured=sum_insured,
+            seating_capacity=answers.get("seating_capacity"),
+        )
+        offer = {
+            "code": code,
+            "label": ext.label,
+            "amount": str(offered_amount.quantize(TWO_PLACES)),
+            "selected": code in chosen_codes,
+            "kind": "excess_protector" if is_excess_protector else "extra",
+        }
+        if ext.limit_label or ext.limit_amount is not None:
+            offer["limit_label"] = ext.limit_label or f"Up to KES {ext.limit_amount:,.0f}"
+        optional_extensions.append(offer)
+
     subtotal = base_premium + extensions_total
     phcf = (subtotal * PHCF_RATE).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
     training_levy = (subtotal * TRAINING_LEVY_RATE).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -361,6 +399,7 @@ async def compute_motor_premium(
         free_benefits=free_benefits,
         payment_plans=payment_plans,
         excesses=excesses,
+        optional_extensions=optional_extensions,
         data_confidence=vehicle_class.data_confidence,
         source_document=vehicle_class.source_document,
         assumptions=assumptions,

@@ -36,6 +36,9 @@ export default function MotorQuotePage() {
   const [customerId, setCustomerId] = useState(GUEST_CUSTOMER_ID);
   // What the customer chose on the form - decides whether a valuation report is asked for.
   const [chosenCoverType, setChosenCoverType] = useState<string | undefined>(undefined);
+  // The answers behind the quotes on screen, kept so ticking an add-on or an excess protector can
+  // re-price them. Not part of a saved session, so it is empty after "resume" (the tick boxes then stay hidden).
+  const [lastAnswers, setLastAnswers] = useState<MotorQuoteFormValues | null>(null);
 
   // Save-and-resume (see lib/quoteSession.ts). Saved only up to "awaiting
   // approval"; reaching payment clears it so a paid customer is never
@@ -86,6 +89,7 @@ export default function MotorQuotePage() {
         referral_code: getStoredReferral(),
       });
       setResult(res);
+      setLastAnswers(values);
       setChosenCoverType(values.cover_type);
       // The backend resolves (or creates) a real guest Customer from the
       // form's owner_phone/owner_name and returns its id here - without
@@ -98,6 +102,28 @@ export default function MotorQuotePage() {
       setStep("compare");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong getting your quotes");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Re-prices the same vehicle and driver answers with the add-ons / excess protectors the customer ticked.
+  async function handleCustomise(extensions: string[]) {
+    if (!lastAnswers) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const answers = { ...lastAnswers, extensions };
+      const res = await api.post<QuoteRequestResult>("/api/v1/quotes", {
+        category: "motor",
+        answers,
+        referral_code: getStoredReferral(),
+      });
+      setResult(res);
+      setLastAnswers(answers);
+      if (res.customer_id) setCustomerId(res.customer_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update your prices");
     } finally {
       setSubmitting(false);
     }
@@ -171,7 +197,13 @@ export default function MotorQuotePage() {
       {step === "compare" && result && (
         <div className="flex flex-col gap-6">
           {result.quotes.length > 0 && <DocumentChecklistCard category="motor" coverType={checklistCoverType} />}
-          <QuoteComparison quotes={result.quotes} note={result.note} onSelect={handleSelectQuote} />
+          <QuoteComparison
+            quotes={result.quotes}
+            note={result.note}
+            onSelect={handleSelectQuote}
+            onCustomise={lastAnswers ? handleCustomise : undefined}
+            busy={submitting}
+          />
         </div>
       )}
 

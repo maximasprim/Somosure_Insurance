@@ -80,6 +80,9 @@ interface ClassDetail extends VehicleClass {
   excesses: Excess[];
   extensions: Extension[];
   free_benefits: FreeBenefit[];
+  /** Provider-wide rows (apply to every class of this insurer); customers see them on every quote. */
+  shared_extensions?: Extension[];
+  shared_free_benefits?: FreeBenefit[];
 }
 
 interface PaymentPlan {
@@ -349,6 +352,13 @@ export default function RateCardProviderDetailPage({ params }: { params: { provi
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add extra benefit");
     }
+  }
+
+  // A provider-wide row belongs to every class, so removing it from here removes it everywhere - ask first.
+  async function handleDeleteShared(kind: "free-benefits" | "extensions", classId: string, rowId: string, label: string) {
+    if (!window.confirm(`"${label}" applies to every class of this insurer. Delete it from all of them?`)) return;
+    await api.del(`/api/v1/admin/rate-cards/${kind}/${rowId}`);
+    await refreshClass(classId);
   }
 
   async function handleDeleteExtension(classId: string, extensionId: string) {
@@ -690,8 +700,8 @@ export default function RateCardProviderDetailPage({ params }: { params: { provi
                         const count =
                           key === "tiers" ? detail.tiers.length
                           : key === "excesses" ? detail.excesses.length
-                          : key === "free_benefits" ? detail.free_benefits.length
-                          : detail.extensions.length;
+                          : key === "free_benefits" ? detail.free_benefits.length + (detail.shared_free_benefits?.length ?? 0)
+                          : detail.extensions.length + (detail.shared_extensions?.length ?? 0);
                         const isActive = tab === key;
                         return (
                           <button
@@ -967,6 +977,49 @@ export default function RateCardProviderDetailPage({ params }: { params: { provi
                           </table>
                         )}
 
+                        {(detail.shared_free_benefits ?? []).length > 0 && (
+                          <div className="mt-5">
+                            <p className="text-xs font-semibold text-ink">
+                              Also included on every class of this insurer ({detail.shared_free_benefits?.length})
+                            </p>
+                            <p className="text-xs text-ink-soft">
+                              Customers see these on every quote, together with the ones above. Deleting one here removes
+                              it from all classes.
+                            </p>
+                            <div className="mt-2 overflow-x-auto">
+                              <table className="w-full min-w-[32rem] text-left text-sm">
+                                <thead className="text-xs uppercase text-ink-soft">
+                                  <tr>
+                                    <th className="pb-2 pr-3">Benefit</th>
+                                    <th className="pb-2 pr-3">Limit</th>
+                                    <th className="pb-2 pr-3">Top-up note</th>
+                                    <th className="pb-2 pr-3">Cover</th>
+                                    <th className="pb-2" />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(detail.shared_free_benefits ?? []).map((b) => (
+                                    <tr key={b.id} className="border-t border-neutral-border align-top">
+                                      <td className="py-1.5 pr-3">{b.label}</td>
+                                      <td className="py-1.5 pr-3">{b.limit_label ?? (b.limit_amount ? `Up to ${b.limit_amount}` : "—")}</td>
+                                      <td className="py-1.5 pr-3">{b.top_up_note ?? "—"}</td>
+                                      <td className="py-1.5 pr-3">{b.cover_type}</td>
+                                      <td className="py-1.5">
+                                        <button
+                                          className="text-xs text-status-error"
+                                          onClick={() => handleDeleteShared("free-benefits", c.id, b.id, b.label)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
                         <p className="mt-4 text-xs font-medium text-ink-soft">Add a free benefit</p>
                         <div className="mt-2 grid gap-2 sm:grid-cols-3">
                           <Field label="Code" hint="A short id, e.g. windscreen.">
@@ -1053,6 +1106,49 @@ export default function RateCardProviderDetailPage({ params }: { params: { provi
                               ))}
                             </tbody>
                           </table>
+                        )}
+
+                        {(detail.shared_extensions ?? []).length > 0 && (
+                          <div className="mt-5">
+                            <p className="text-xs font-semibold text-ink">
+                              Also offered on every class of this insurer ({detail.shared_extensions?.length})
+                            </p>
+                            <p className="text-xs text-ink-soft">
+                              Customers can tick these on every quote, together with the ones above. Deleting one here
+                              removes it from all classes.
+                            </p>
+                            <div className="mt-2 overflow-x-auto">
+                              <table className="w-full min-w-[32rem] text-left text-sm">
+                                <thead className="text-xs uppercase text-ink-soft">
+                                  <tr>
+                                    <th className="pb-2 pr-3">Benefit</th>
+                                    <th className="pb-2 pr-3">Basis</th>
+                                    <th className="pb-2 pr-3">Rate / Amount</th>
+                                    <th className="pb-2 pr-3">Limit</th>
+                                    <th className="pb-2" />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(detail.shared_extensions ?? []).map((ext) => (
+                                    <tr key={ext.id} className="border-t border-neutral-border align-top">
+                                      <td className="py-1.5 pr-3">{ext.label}</td>
+                                      <td className="py-1.5 pr-3">{ext.basis}</td>
+                                      <td className="py-1.5 pr-3">{ext.rate_percent ? `${ext.rate_percent}%` : ext.flat_amount ?? "—"}</td>
+                                      <td className="py-1.5 pr-3">{ext.limit_label ?? (ext.limit_amount ? `Up to ${ext.limit_amount}` : "—")}</td>
+                                      <td className="py-1.5">
+                                        <button
+                                          className="text-xs text-status-error"
+                                          onClick={() => handleDeleteShared("extensions", c.id, ext.id, ext.label)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
                         )}
 
                         <p className="mt-4 text-xs font-medium text-ink-soft">Add an extra benefit</p>

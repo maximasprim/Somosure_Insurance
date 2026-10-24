@@ -76,6 +76,10 @@ class RateCardAdapter(InsuranceProviderAdapter):
             # customer sees the whole picture at quote time, same as a
             # broker's own printed rate card would show it.
             coverage["free_benefits"] = breakdown.free_benefits
+        if breakdown.optional_extensions:
+            # Everything else on offer (incl. excess protectors), priced for this vehicle, so the quote
+            # page can let the customer tick or untick what they want.
+            coverage["optional_extensions"] = breakdown.optional_extensions
         if breakdown.assumptions:
             coverage["assumptions"] = breakdown.assumptions
         if breakdown.data_confidence != "verified":

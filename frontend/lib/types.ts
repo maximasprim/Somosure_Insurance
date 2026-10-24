@@ -30,6 +30,21 @@ export interface ExtraBenefitCatalogItem {
   label: string;
 }
 
+/** An add-on an insurer offers for this vehicle (incl. excess protectors), priced for it. */
+export interface OptionalExtension {
+  code: string;
+  label: string;
+  amount: string;
+  selected: boolean;
+  kind: "excess_protector" | "extra";
+  limit_label?: string;
+}
+
+export interface ExcessLine {
+  peril?: string;
+  label: string;
+}
+
 export interface NormalizedQuote {
   id: string;
   provider_id: string;

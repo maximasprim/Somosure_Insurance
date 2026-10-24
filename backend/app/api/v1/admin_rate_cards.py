@@ -165,7 +165,31 @@ async def _load_class_detail(db: AsyncSession, class_id) -> RateCardVehicleClass
     free_benefits = (
         await db.scalars(select(RateCardFreeBenefit).where(RateCardFreeBenefit.vehicle_class_id == vehicle_class.id))
     ).all()
+    # Provider-wide rows apply to every class of this provider (the quote engine merges them in), so
+    # show them too - except where this class has its own row for the same thing, which overrides them.
+    shared_extensions = (
+        await db.scalars(
+            select(RateCardExtension).where(
+                RateCardExtension.provider_id == vehicle_class.provider_id,
+                RateCardExtension.vehicle_class_id.is_(None),
+            )
+        )
+    ).all()
+    shared_free_benefits = (
+        await db.scalars(
+            select(RateCardFreeBenefit).where(
+                RateCardFreeBenefit.provider_id == vehicle_class.provider_id,
+                RateCardFreeBenefit.vehicle_class_id.is_(None),
+            )
+        )
+    ).all()
+    own_extension_codes = {e.code for e in extensions}
+    own_benefit_keys = {(b.code, b.cover_type) for b in free_benefits}
     detail = VehicleClassDetailOut.model_validate(vehicle_class)
+    detail.shared_extensions = [ExtensionOut.model_validate(e) for e in shared_extensions if e.code not in own_extension_codes]
+    detail.shared_free_benefits = [
+        FreeBenefitOut.model_validate(b) for b in shared_free_benefits if (b.code, b.cover_type) not in own_benefit_keys
+    ]
     detail.tiers = [TierOut.model_validate(t) for t in tiers]
     detail.extensions = [ExtensionOut.model_validate(e) for e in extensions]
     detail.excesses = [ExcessOut.model_validate(e) for e in excesses]

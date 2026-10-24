@@ -312,7 +312,7 @@ export function readQuoteSections(
   const exclusionItems = asArray<string>(exclusions.items).filter((i) => typeof i === "string");
 
   // Anything else the provider returned that we have no special layout for.
-  const known = new Set(["summary", "extensions", "free_benefits", "assumptions", "data_confidence_notice"]);
+  const known = new Set(["summary", "extensions", "optional_extensions", "free_benefits", "assumptions", "data_confidence_notice"]);
   const otherCoverage: DetailRow[] = Object.entries(coverage)
     .filter(([k, v]) => !known.has(k) && v !== null && v !== "" && !isObject(v))
     .map(([k, v]) => ({ key: k, label: labelFor(k), value: formatAnswer(k, v) }));

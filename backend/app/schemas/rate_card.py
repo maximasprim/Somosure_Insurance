@@ -92,6 +92,10 @@ class VehicleClassDetailOut(VehicleClassOut):
     extensions: list["ExtensionOut"] = []
     excesses: list["ExcessOut"] = []
     free_benefits: list["FreeBenefitOut"] = []
+    # Provider-wide rows (no vehicle class): they apply to EVERY class of this provider, and customers
+    # see them on every quote. Listed separately so the admin screen shows what customers actually get.
+    shared_extensions: list["ExtensionOut"] = []
+    shared_free_benefits: list["FreeBenefitOut"] = []
 
 
 class ExtensionIn(BaseModel):
