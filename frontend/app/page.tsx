@@ -32,10 +32,10 @@ const INSURE_OPTIONS = [
   { category: "personal_accident", name: "Personal accident", href: "/quote/personal_accident", desc: "A lump-sum payout if an accident affects your ability to work." },
   { category: "professional_indemnity", name: "Professional indemnity", href: "/quote/professional_indemnity", desc: "Cover against claims of negligence or error in your professional service." },
   { category: "wiba", name: "WIBA", href: "/quote/wiba", desc: "Statutory cover for your employees against workplace injury." },
-  { category: "cargo", name: "Cargo", href: "/quote/cargo", desc: "Local and marine cover for goods in transit.", comingSoon: true },
-  { category: "hull", name: "Hull", href: "/quote/hull", desc: "Cover for boats, vessels and their machinery.", comingSoon: true },
-  { category: "cybersecurity", name: "Cybersecurity", href: "/quote/cybersecurity", desc: "Protection against data breaches and ransomware.", comingSoon: true },
-  { category: "last_expense", name: "Last expense", href: "/quote/last_expense", desc: "A lump sum to help your family with funeral and burial costs.", comingSoon: true },
+  { category: "cargo", name: "Cargo", href: "/quote/cargo", desc: "Local and marine cover for goods in transit."},
+  { category: "hull", name: "Hull", href: "/quote/hull", desc: "Cover for boats, vessels and their machinery."},
+  { category: "cybersecurity", name: "Cybersecurity", href: "/quote/cybersecurity", desc: "Protection against data breaches and ransomware."},
+  { category: "last_expense", name: "Last expense", href: "/quote/last_expense", desc: "A lump sum to help your family with funeral and burial costs."},
 ];
 
 const TRUST_ROW = [
