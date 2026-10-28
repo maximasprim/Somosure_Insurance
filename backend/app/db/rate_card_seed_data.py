@@ -372,15 +372,19 @@ AMACO_PROVIDER_EXTENSIONS = [
 # fleet breakdown explicit) keep data_confidence="needs_review" and say
 # exactly what's uncertain in their notes.
 PIONEER_CLASSES = [
-    {
+ {
         "code": "motor_private",
         "label": "Motor Private & Double Cabins",
         "min_sum_insured": 500000,
         "max_vehicle_age_years": 15,
         "comprehensive_ineligible_action": "downgrade_to_tpo",
         "data_confidence": "verified",
-        "notes": "Comprehensive minimum premium Kshs. 37,500 (single unit) / Kshs. 30,000 (fleet). Fleet TPO is "
-        "Kshs. 6,500 flat (single unit 7,500) - see motor_private_fleet_individual for the fleet class.",
+        "notes": "Comprehensive minimum premium Kshs. 37,500 (single unit) / Kshs. 30,000 (fleet). Single-unit TPO "
+        "Kshs. 7,500; fleet TPO Kshs. 6,500 flat - see motor_private_fleet_individual for the fleet class. The 6% "
+        "Basic band (500,000-999,999) does NOT include excess protector or PVT; every band from 1,000,000 up "
+        "includes both. Courtesy car (extra charge): Kshs. 4,500 for a 10-day / Kshs. 30,000 limit on sums insured "
+        "2,500,000-4,999,999, Kshs. 7,500 for a 20-day / Kshs. 60,000 limit on 5,000,000 and above - not offered "
+        "below 2,500,000 (not enforced automatically, see the courtesy_car extension note).",
         "tiers": [
             {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 500000, "max_value": 999999,
              "rate_percent": 6.0, "min_premium": 37500, "label": "500,000-999,999 (Basic)", "tier_order": 1},
@@ -388,71 +392,72 @@ PIONEER_CLASSES = [
              "rate_percent": 5.0, "min_premium": 37500, "label": "1,000,000-1,499,999, incl. EP & PVT", "tier_order": 2},
             {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 1500000, "max_value": 2499999,
              "rate_percent": 4.0, "min_premium": 37500, "label": "1,500,000-2,499,999, incl. EP & PVT", "tier_order": 3},
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 2500000, "max_value": None,
-             "rate_percent": 3.25, "min_premium": 37500, "label": "2,500,000 and above, incl. EP & PVT "
-             "(source document does not give a distinct rate for this band; top listed rate reused)", "tier_order": 4},
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 2500000, "max_value": 4999999,
+             "rate_percent": 3.25, "min_premium": 37500, "label": "2,500,000-4,999,999, incl. EP & PVT", "tier_order": 4},
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 5000000, "max_value": None,
+             "rate_percent": 3.0, "min_premium": 37500, "label": "5,000,000 and above, incl. EP & PVT", "tier_order": 5},
             {"cover_type": "tpo", "band_unit": "none", "flat_amount": 7500, "min_premium": 7500,
              "label": "Single unit", "tier_order": 1},
         ],
     },
-    {
+ {
         "code": "motor_private_fleet_individual",
         "label": "Motor Private Fleet",
         "data_confidence": "verified",
-        "notes": "Source document gives a fleet minimum premium and fleet TPO rate but no distinct fleet "
-        "comprehensive %; the Motor Private comprehensive bands are reused here.",
+        "notes": "Fleet (3 and above): a single comprehensive rate of 3% inclusive of excess protector and PVT, "
+        "minimum premium Kshs. 30,000, whatever the sum insured. Fleet TPO Kshs. 6,500 flat.",
         "tiers": [
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 500000, "max_value": 999999,
-             "rate_percent": 6.0, "min_premium": 30000, "label": "500,000-999,999", "tier_order": 1},
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 1000000, "max_value": 1499999,
-             "rate_percent": 5.0, "min_premium": 30000, "label": "1,000,000-1,499,999", "tier_order": 2},
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 1500000, "max_value": 2499999,
-             "rate_percent": 4.0, "min_premium": 30000, "label": "1,500,000-2,499,999", "tier_order": 3},
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "min_value": 2500000, "max_value": None,
-             "rate_percent": 3.25, "min_premium": 30000, "label": "2,500,000 and above", "tier_order": 4},
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 3.0, "min_premium": 30000,
+             "label": "Fleet (3 & above), incl. EP & PVT", "tier_order": 1},
             {"cover_type": "tpo", "band_unit": "none", "flat_amount": 6500, "min_premium": 6500,
              "label": "Fleet", "tier_order": 1},
         ],
     },
-    {
+ {
         "code": "motor_commercial_hybrid",
         "label": "Motor Commercial Hybrid Cover (Own Goods & General Cartage)",
         "min_sum_insured": 500000,
         "max_vehicle_age_years": 15,
         "comprehensive_ineligible_action": "downgrade_to_tpo",
-        "data_confidence": "needs_review",
-        "notes": "Comprehensive: 3% min Kshs. 37,500 for General Cartage, 2.5% min Kshs. 37,500 for Own Goods "
-        "(the source lists both rates together without a fully explicit per-category label - Own Goods is "
-        "priced here as the cheaper of the two since that matches every other broker's own-goods-vs-cartage "
-        "ordering; verify against the original document). Fleet and zero-mileage vehicles share the same "
-        "Kshs. 7,500 flat TPO rate as a single unit. Farm & Warehouses TPO Kshs. 7,500, Construction TPO "
-        "Kshs. 10,000 - see farm_warehouses and construction classes. Fleet (3+): Own Damage Excess Protector "
-        "inclusive up to 3 tonnes; PVT free up to Kshs. 5M for 4-15 tonnes, else 0.25% min Kshs. 2,500 - not "
-        "applied automatically, no fleet-specific premium figures were given.",
+        "data_confidence": "verified",
+        "notes": "Comprehensive: one rate for single, fleet and zero-mileage vehicles - 4.5% inclusive of excess "
+        "protector and PVT (PVT is free up to Kshs. 5M; above 5M it is 0.25%, min Kshs. 2,500 - not applied "
+        "automatically), minimum premium Kshs. 50,000. Third Party Only is one schedule for General Cartage and "
+        "Own Goods, priced by tonnage.",
         "tiers": [
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 2.5, "min_premium": 37500,
-             "label": "Own Goods (best-effort read of the source table - verify)", "tier_order": 1},
-            {"cover_type": "tpo", "band_unit": "none", "flat_amount": 7500, "min_premium": 7500,
-             "label": "Single, fleet & zero-mileage vehicles", "tier_order": 1},
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 4.5, "min_premium": 50000,
+             "label": "Single, fleet & zero-mileage, incl. EP & PVT", "tier_order": 1},
+            {"cover_type": "tpo", "band_unit": "tonnes", "min_value": 0, "max_value": 3,
+             "flat_amount": 7500, "min_premium": 7500, "label": "Up to 3 tonnes", "tier_order": 1},
+            {"cover_type": "tpo", "band_unit": "tonnes", "min_value": 3.01, "max_value": 8,
+             "flat_amount": 10000, "min_premium": 10000, "label": "4 - 8 tonnes", "tier_order": 2},
+            {"cover_type": "tpo", "band_unit": "tonnes", "min_value": 8.01, "max_value": 15,
+             "flat_amount": 15000, "min_premium": 15000, "label": "9 - 15 tonnes", "tier_order": 3},
+            {"cover_type": "tpo", "band_unit": "tonnes", "min_value": 15.01, "max_value": None,
+             "flat_amount": 20000, "min_premium": 20000, "label": "Above 15 tonnes", "tier_order": 4},
         ],
     },
-    {
+ {
         "code": "farm_warehouses",
         "label": "Special Type - Farm & Warehouses",
         "data_confidence": "verified",
-        "notes": "Own Damage Excess Protector 0.5% of sum insured, min Kshs. 5,000 - not a separate comprehensive "
-        "% rate is given in the source; only the TPO figure below is priced.",
+        "notes": "Comprehensive 2.5%, minimum premium Kshs. 37,500. Own Damage Excess Protector is an extra at "
+        "0.5% of sum insured, min Kshs. 5,000.",
         "tiers": [
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 2.5, "min_premium": 37500,
+             "label": "2.5%, min Kshs. 37,500", "tier_order": 1},
             {"cover_type": "tpo", "band_unit": "none", "flat_amount": 7500, "min_premium": 7500, "tier_order": 1},
         ],
     },
-    {
+ {
         "code": "construction",
         "label": "Special Type - Construction",
         "data_confidence": "verified",
-        "notes": "PVT free up to Kshs. 5M, above 5M: 0.25% min Kshs. 2,500 - not a separate comprehensive % rate "
-        "is given in the source; only the TPO figure below is priced.",
+        "notes": "Comprehensive 3%, minimum premium Kshs. 37,500. PVT free up to Kshs. 5M, above 5M: 0.25% min "
+        "Kshs. 2,500 (the free threshold is not applied automatically).",
         "tiers": [
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 3.0, "min_premium": 37500,
+             "label": "3%, min Kshs. 37,500", "tier_order": 1},
             {"cover_type": "tpo", "band_unit": "none", "flat_amount": 10000, "min_premium": 10000, "tier_order": 1},
         ],
     },
@@ -501,18 +506,19 @@ PIONEER_CLASSES = [
              "label": "5% inclusive of EP & PVT, min. 40,000", "tier_order": 1},
         ],
     },
-    {
+ {
         "code": "school_bus",
         "label": "School Buses / Vans",
         "min_sum_insured": 500000,
         "max_vehicle_age_years": 15,
         "data_confidence": "verified",
-        "notes": "Comprehensive inclusive of Own Damage Excess Protector (0.5% min Kshs. 5,000) and PVT (free up "
-        "to Kshs. 5M, above that 0.25% min Kshs. 2,500) - not broken out separately. Free PLL for students only; "
-        "PLL for hire to non-affiliated groups is Kshs. 500 per head, added on top of the TPO figures below.",
+        "notes": "Comprehensive 3.5% inclusive of Own Damage Excess Protector and PVT (PVT free up to Kshs. 5M, "
+        "above that 0.25% min Kshs. 2,500), minimum premium Kshs. 37,500. Free PLL for students only; PLL for "
+        "hire is Kshs. 250 per seat (affiliated groups) or Kshs. 500 per head (non-affiliated groups), added on "
+        "top of the TPO figures below.",
         "tiers": [
-            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 3.0, "min_premium": 50000,
-             "label": "3% inclusive of EP & PVT", "tier_order": 1},
+            {"cover_type": "comprehensive", "band_unit": "sum_insured", "rate_percent": 3.5, "min_premium": 37500,
+             "label": "3.5% inclusive of EP & PVT, min Kshs. 37,500", "tier_order": 1},
             {"cover_type": "tpo", "band_unit": "passengers", "min_value": 0, "max_value": 14,
              "flat_amount": 7500, "min_premium": 7500, "label": "Up to 14 passengers (plus Kshs. 250/person PLL)",
              "tier_order": 1},
