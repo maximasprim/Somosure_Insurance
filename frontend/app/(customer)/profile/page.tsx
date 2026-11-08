@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -49,6 +50,11 @@ export default function ProfilePage() {
         {saved && <p className="text-sm text-status-success">Saved.</p>}
         <Button onClick={handleSave}>Save changes</Button>
       </Card>
+      <p className="mt-4 text-sm text-ink-soft">
+        <Link href="/change-password" className="font-medium text-ink underline">
+          Change my password
+        </Link>
+      </p>
     </main>
   );
 }

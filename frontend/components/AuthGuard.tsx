@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { clearSession, hasValidSession } from "@/lib/api";
+import { clearSession, hasValidSession, mustChangePassword } from "@/lib/api";
 
 /**
  * Wraps a protected route group (customer dashboard, admin) so its pages
@@ -37,6 +37,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!hasValidSession()) {
       clearSession();
       router.replace("/login");
+      return;
+    }
+    if (mustChangePassword()) {
+      // An administrator set their password - they choose their own before anything else.
+      router.replace("/change-password");
       return;
     }
     setChecked(true);

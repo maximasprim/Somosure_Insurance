@@ -97,6 +97,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   rememberGuestToken(res);
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
+    // An administrator set this account's password: nothing else works until the
+    // user picks their own, so send them to the change-password screen.
+    if (res.status === 403 && detail.detail === "password_change_required" && typeof window !== "undefined") {
+      if (window.location.pathname !== "/change-password") window.location.href = "/change-password";
+      throw new Error("Please choose a new password to continue.");
+    }
     throw new Error(formatDetail(detail.detail, `Request failed: ${res.status}`));
   }
   if ((options.method ?? "GET").toUpperCase() !== "GET") notifyDataChanged();
@@ -183,6 +189,12 @@ export function getTokenRole(): string | null {
 export function getTokenUserId(): string | null {
   const payload = getTokenPayload();
   return (payload?.sub as string) ?? null;
+}
+
+// True while an administrator-set password still has to be replaced. UI routing
+// only - the server refuses every other request until it is changed.
+export function mustChangePassword(): boolean {
+  return getTokenPayload()?.mcp === true;
 }
 
 // True once the token's own "exp" claim (seconds since epoch) is in the

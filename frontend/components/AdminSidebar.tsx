@@ -100,7 +100,7 @@ const SECTIONS: NavSection[] = [
   {
     title: "Administration",
     items: [
-      { label: "Staff & access", href: "/admin/users", icon: UserCog },
+      { label: "Users & access", href: "/admin/users", icon: UserCog },
       { label: "Audit trail", href: "/admin/audit", icon: ScrollText },
     ],
   },
@@ -168,7 +168,7 @@ export function AdminSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-neutral-border bg-white md:flex">
+      <aside className="sticky top-0 hidden h-screen w-54 shrink-0 flex-col border-r border-neutral-border bg-white md:flex">
         <div className="flex items-center justify-between border-b border-neutral-border px-5 py-3">
           <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
             {/* Somosure */}
@@ -195,14 +195,17 @@ export function AdminSidebar() {
           </Link>
         </div>
         <NavLinks pathname={pathname} />
-        <div className="border-t border-neutral-border px-3 py-3">
+        <div className="border-t border-neutral-border px-3 py-1">
           {role && <p className="px-3 pb-2 text-xs text-ink-soft">Signed in - {role.replace(/_/g, " ")}</p>}
-          <Link href="/" className="flex items-center gap-2.5 rounded-control px-3 py-2 text-sm font-medium text-ink-soft hover:bg-neutral hover:text-ink">
+          <Link href="/" className="flex items-center gap-2.5 rounded-control px-3 py-1 text-sm font-medium text-blue-300 hover:bg-neutral hover:text-blue-200 underline">
             <Home className="h-4 w-4" /> Back to site
+          </Link>
+          <Link href="/change-password" className="flex items-center gap-2.5 rounded-control px-3 py-1 text-sm font-medium text-ink-soft hover:bg-neutral hover:text-ink">
+            <UserCog className="h-4 w-4" /> Change password
           </Link>
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-left text-sm font-medium text-ink-soft hover:bg-neutral hover:text-ink"
+            className="flex w-full items-center gap-2.5 rounded-control px-3 py-1 text-left text-sm font-medium text-ink-soft hover:bg-neutral hover:text-ink"
           >
             <LogOut className="h-4 w-4" /> Log out
           </button>
@@ -246,6 +249,9 @@ export function AdminSidebar() {
               <div className="border-t border-neutral-border px-3 py-3">
                 <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 rounded-control px-3 py-2 text-sm font-medium hover:bg-neutral">
                   <Home className="h-4 w-4" /> Back to site
+                </Link>
+                <Link href="/change-password" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5 rounded-control px-3 py-2 text-sm font-medium hover:bg-neutral">
+                  <UserCog className="h-4 w-4" /> Change password
                 </Link>
                 <button
                   onClick={() => {

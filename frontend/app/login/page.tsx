@@ -13,6 +13,7 @@ interface TokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  must_change_password?: boolean;
 }
 
 export default function LoginPage() {
@@ -29,6 +30,10 @@ export default function LoginPage() {
     try {
       const res = await api.post<TokenResponse>("/api/v1/auth/login", { email, password });
       storeSession(res.access_token, res.refresh_token);
+      if (res.must_change_password) {
+        router.push("/change-password");
+        return;
+      }
       const role = getTokenRole();
       const staffRoles = ["super_admin", "operations", "management", "underwriter", "claims_officer", "finance_officer"];
       router.push(role && staffRoles.includes(role) ? "/admin" : "/dashboard");
