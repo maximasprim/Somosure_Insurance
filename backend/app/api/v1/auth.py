@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.core.security import (
+    get_current_claims,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -23,6 +24,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.user import Role, User, UserRole
 from app.notifications.registry import get_dispatcher
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -149,8 +151,11 @@ async def login(request: Request, payload: LoginRequest, db: AsyncSession = Depe
     )
 
     return TokenResponse(
-        access_token=create_access_token(str(user.id), role_name),
-        refresh_token=create_refresh_token(str(user.id)),
+        access_token=create_access_token(
+            str(user.id), role_name, user.token_version, user.must_change_password
+        ),
+        refresh_token=create_refresh_token(str(user.id), user.token_version),
+        must_change_password=user.must_change_password,
     )
 
 
@@ -163,6 +168,9 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
     user = await db.get(User, claims["sub"])
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid session")
+    if int(claims.get("tv", 0)) != int(user.token_version or 0):
+        # Signed out remotely, or the password was changed/reset since this was issued.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid session")
 
     role_row = await db.scalar(
         select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user.id)
@@ -170,8 +178,11 @@ async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
     role_name = role_row or "customer"
 
     return TokenResponse(
-        access_token=create_access_token(str(user.id), role_name),
-        refresh_token=create_refresh_token(str(user.id)),
+        access_token=create_access_token(
+            str(user.id), role_name, user.token_version, user.must_change_password
+        ),
+        refresh_token=create_refresh_token(str(user.id), user.token_version),
+        must_change_password=user.must_change_password,
     )
 
 
@@ -229,5 +240,50 @@ async def reset_password(request: Request, payload: ResetPasswordRequest, db: As
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset link is invalid or has expired")
 
     user.hashed_password = hash_password(payload.new_password)
+    # They chose this password themselves, so no forced change is pending - and any
+    # session that existed under the old password is ended.
+    user.must_change_password = False
+    user.token_version = (user.token_version or 0) + 1
     token_row.used_at = now
     await db.commit()
+
+
+@router.post("/change-password", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def change_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(get_current_claims),
+):
+    """A signed-in user changes their own password. This is also the one call a
+    user with a forced change pending is allowed to make. Every other device is
+    signed out; the response carries fresh tokens so this one stays signed in."""
+    user = await db.get(User, claims["sub"])
+    if not user or not verify_password(payload.current_password, user.hashed_password):
+        # 400, not 401: the frontend treats a 401 as an expired session.
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Your current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a password different from your current one")
+
+    user.hashed_password = hash_password(payload.new_password)
+    user.must_change_password = False
+    user.token_version = (user.token_version or 0) + 1
+
+    role_name = (
+        await db.scalar(select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user.id))
+    ) or "customer"
+    record_event(
+        "auth.password_changed",
+        entity_type="users",
+        entity_id=user.id,
+        entity_label=user.email,
+        summary=f"{user.full_name} changed their password",
+    )
+    await db.commit()
+
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), role_name, user.token_version, False),
+        refresh_token=create_refresh_token(str(user.id), user.token_version),
+        must_change_password=False,
+    )

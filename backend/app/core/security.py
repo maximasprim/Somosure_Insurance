@@ -3,12 +3,14 @@ from typing import Any
 import hashlib
 import secrets
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.database import get_db
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -48,19 +50,20 @@ def create_token(subject: str, expires_delta: timedelta, extra_claims: dict[str,
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: str, role: str) -> str:
-    return create_token(
-        user_id,
-        timedelta(minutes=settings.access_token_expire_minutes),
-        {"role": role, "type": "access"},
-    )
+def create_access_token(user_id: str, role: str, token_version: int = 0, must_change_password: bool = False) -> str:
+    claims: dict[str, Any] = {"role": role, "type": "access", "tv": token_version}
+    if must_change_password:
+        # Lets the frontend send the user to the change-password screen; the server
+        # enforces it independently (see get_current_claims).
+        claims["mcp"] = True
+    return create_token(user_id, timedelta(minutes=settings.access_token_expire_minutes), claims)
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str, token_version: int = 0) -> str:
     return create_token(
         user_id,
         timedelta(days=settings.refresh_token_expire_days),
-        {"type": "refresh"},
+        {"type": "refresh", "tv": token_version},
     )
 
 
@@ -71,10 +74,32 @@ def decode_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
 
-async def get_current_claims(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
+def token_matches_user(claims: dict[str, Any], user: Any) -> bool:
+    """A token is only good while its account is active and its version is the
+    account's current one. Tokens issued before versions existed carry no "tv" and
+    count as version 0, so they keep working until the version is bumped."""
+    return bool(user and user.is_active and int(claims.get("tv", 0)) == int(user.token_version or 0))
+
+
+# While must_change_password is set, the only thing a signed-in user may do is change it.
+PASSWORD_CHANGE_ALLOWED_PATHS = {"/api/v1/auth/change-password"}
+
+
+async def get_current_claims(
+    request: Request, token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> dict[str, Any]:
+    from app.models.user import User  # local import: models import core.database
+
     claims = decode_token(token)
     if claims.get("type") != "access":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not an access token")
+
+    user = await db.get(User, claims["sub"])
+    if not token_matches_user(claims, user):
+        # Signed out remotely, password changed/reset, role changed, or deactivated.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Your session has ended - please sign in again")
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ALLOWED_PATHS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="password_change_required")
     return claims
 
 

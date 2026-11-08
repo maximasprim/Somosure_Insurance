@@ -23,7 +23,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import event, inspect
+from sqlalchemy import String, event, inspect
 from sqlalchemy.orm import Session
 
 from app.audit.context import AuditContext, current_context
@@ -62,6 +62,7 @@ MAX_VALUE_CHARS = 300
 NOT_RECORDED = "(not recorded)"
 LABEL_FIELDS = ("reference", "name", "title", "email", "full_name", "code", "phone")
 PENDING_KEY = "_audit_pending"
+ENTITY_ID_MAX = 64
 
 _installed = False
 
@@ -122,7 +123,11 @@ def _entity_id(obj: Any, state) -> str | None:
     except Exception:
         return None
     parts = [str(p) for p in pk if p is not None]
-    return "/".join(parts) if parts else None
+    if not parts:
+        return None
+    # A composite key of two UUIDs (user_roles, role_permissions...) is 73 characters;
+    # the audit column holds 64. The full values are kept in the row's change details.
+    return "/".join(parts)[:ENTITY_ID_MAX]
 
 
 def _related_customer(obj: Any, state) -> str | None:
@@ -249,6 +254,14 @@ def _discard(*args, **kwargs) -> None:
     session.info.pop(PENDING_KEY, None)
 
 
+# Sized from the table itself so it can't drift from the model.
+_COLUMN_LIMITS = {
+    c.name: c.type.length
+    for c in AuditLog.__table__.columns
+    if isinstance(c.type, String) and getattr(c.type, "length", None)
+}
+
+
 def _build_row(
     kind: str,
     action: str,
@@ -263,7 +276,7 @@ def _build_row(
     reason: str | None = None,
     details: dict | None = None,
 ) -> AuditLog:
-    return AuditLog(
+    values = dict(
         id=uuid.uuid4(),
         occurred_at=when,
         kind=kind,
@@ -287,6 +300,14 @@ def _build_row(
         ip=ctx.ip if ctx else None,
         user_agent=(ctx.user_agent[:300] if ctx and ctx.user_agent else None),
     )
+    # The audit insert runs in the same transaction as the change it records, so an
+    # over-long value would fail the user's whole request. Clip every text field to
+    # its column size instead - the trail is allowed to be terse, never to break things.
+    for name, limit in _COLUMN_LIMITS.items():
+        value = values.get(name)
+        if isinstance(value, str) and len(value) > limit:
+            values[name] = value[:limit]
+    return AuditLog(**values)
 
 
 def install() -> None:

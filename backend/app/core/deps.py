@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import decode_token, get_current_claims
+from app.core.security import decode_token, get_current_claims, token_matches_user
 from app.models.customer import Customer
 from app.models.user import User
 
@@ -50,6 +50,9 @@ async def get_optional_customer_id(
     except HTTPException:
         return None
     if claims.get("type") != "access":
+        return None
+    # A signed-out / deactivated session is just a guest here, never an error.
+    if not token_matches_user(claims, await db.get(User, claims["sub"])):
         return None
     customer = await db.scalar(select(Customer).where(Customer.user_id == claims["sub"]))
     return str(customer.id) if customer else None
