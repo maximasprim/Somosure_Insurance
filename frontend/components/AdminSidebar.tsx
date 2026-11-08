@@ -150,6 +150,30 @@ function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigat
 }
 
 /**
+ * The Somosure logo with its yellow glow - the same mark the desktop sidebar
+ * shows, used by the mobile top bar and drawer so the logo appears there too.
+ */
+function LogoMark() {
+  return (
+    <div className="relative inline-block">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{
+          width: "220%",
+          height: "220%",
+          background:
+            "radial-gradient(circle, rgba(255,204,0,0.95) 0%, rgba(255,204,0,0.55) 30%, rgba(255,204,0,0.20) 55%, transparent 72%)",
+          filter: "blur(14px)",
+          zIndex: 0,
+        }}
+      />
+      <Image src={SomosureLogo} alt="Somosure" className="relative z-10 h-6 w-auto" priority />
+    </div>
+  );
+}
+
+/**
  * Shared shell for every /admin/* page (see app/admin/layout.tsx). Before
  * this, each of the 12+ admin pages was a bare <main> with no link to any
  * other admin section - staff had to know/bookmark every URL by hand.
@@ -195,7 +219,7 @@ export function AdminSidebar() {
           </Link>
         </div>
         <NavLinks pathname={pathname} />
-        <div className="border-t border-neutral-border px-3 py-1">
+        <div className="border-t border-neutral-border px-3 py-2">
           {role && <p className="px-3 pb-2 text-xs text-ink-soft">Signed in - {role.replace(/_/g, " ")}</p>}
           <Link href="/" className="flex items-center gap-2.5 rounded-control px-3 py-1 text-sm font-medium text-blue-300 hover:bg-neutral hover:text-blue-200 underline">
             <Home className="h-4 w-4" /> Back to site
@@ -214,8 +238,8 @@ export function AdminSidebar() {
 
       {/* Mobile top bar + drawer */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-border bg-white px-4 py-3 md:hidden">
-        <Link href="/admin" className="font-display text-base font-extrabold tracking-tight">
-          Somosure <span className="font-normal text-ink-soft">Admin</span>
+        <Link href="/admin" aria-label="Somosure Admin">
+          <LogoMark />
         </Link>
         <button onClick={() => setMobileOpen(true)} className="rounded-control p-2 text-ink" aria-label="Open menu">
           <Menu className="h-6 w-6" />
@@ -240,7 +264,7 @@ export function AdminSidebar() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between border-b border-neutral-border px-5 py-4">
-                <span className="font-display text-base font-extrabold">Somosure Admin</span>
+                <LogoMark />
                 <button onClick={() => setMobileOpen(false)} aria-label="Close menu">
                   <X className="h-6 w-6" />
                 </button>
