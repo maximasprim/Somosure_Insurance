@@ -19,7 +19,7 @@ export const PARTNER_TYPES: { value: string; label: string }[] = [
 ];
 
 const MODELS = [
-  { value: "referrals", label: "Refer our customers to Somosure" },
+  { value: "referrals", label: "Refer customers to Somosure" },
   { value: "applications", label: "Submit insurance applications for our customers" },
   { value: "both", label: "Both" },
 ];

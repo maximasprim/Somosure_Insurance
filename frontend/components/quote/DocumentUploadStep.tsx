@@ -125,7 +125,7 @@ export function DocumentUploadStep({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{doc.label}</span>
-                  {fresh && <Badge tone="success">Uploaded</Badge>}
+                  {fresh && <Badge tone="success">Upload Successful</Badge>}
                   {onFile && (
                     <Badge tone="success">
                       {doc.source === "earlier_application" ? "Already on file from before" : "Already on file"}

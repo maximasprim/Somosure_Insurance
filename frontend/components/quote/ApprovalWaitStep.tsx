@@ -87,9 +87,8 @@ export function ApprovalWaitStep({
     <Card className="flex flex-col items-start gap-3">
       <h2 className="text-xl font-bold">Under review</h2>
       <p className="text-ink-soft">
-        Your application <span className="font-semibold text-ink">{reference}</span> is with our underwriting team -
-        usually a few hours. You can keep this page open: we&apos;ll check for you and take you straight to payment the
-        moment it&apos;s approved. You&apos;ll also be notified.
+        Your application <span className="font-semibold text-ink">{reference}</span> is with our underwriting team.
+        This may take a few hours for review. You&apos;ll also be notified to be proceed to payment.
       </p>
       <Button variant="ghost" onClick={check} disabled={checking}>
         {checking ? "Checking…" : "Check status now"}

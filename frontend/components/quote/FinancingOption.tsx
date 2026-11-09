@@ -159,7 +159,7 @@ export function FinancingOption({
         }}
         className="text-sm font-semibold text-brand-deep hover:underline"
       >
-        Can't pay it all at once? Spread the cost with Bidii Credit financing →
+        Can't pay it all at once? Get financing from our partner Bidii Credit. Additional vetting by Bidii Credit will be done →
       </button>
     );
   }

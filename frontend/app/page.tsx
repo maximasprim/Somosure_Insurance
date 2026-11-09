@@ -138,7 +138,7 @@ export default function HomePage() {
               Insurance Made Simpler
             </h1>
             <p className="max-w-prose text-lg text-white/90">
-              Compare, understand, buy and manage your insurance from one trusted platform.
+              Compare, buy and manage your insurance from one trusted platform.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
               <Link href="/quote/motor"><Button className="px-6 py-2 rounded-full">Get a quote</Button></Link>
@@ -248,9 +248,9 @@ export default function HomePage() {
         <Reveal>
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card bg-brand-tint/60 px-6 py-10 text-center md:flex-row md:justify-between md:text-left">
             <div>
-              <h2 className="text-xl font-bold md:text-2xl">Run a dealership, SACCO, bank, agency or business?</h2>
+              <h2 className="text-xl font-bold md:text-2xl">Do you run a vehicle Dealership, SACCO, Bank, Agency?</h2>
               <p className="mt-2 max-w-xl text-ink-soft">
-                Partner with Somosure. Send your customers to quality cover and get rewarded for it.
+                Refer your customers to us and get rewarded.
               </p>
             </div>
             <Link href="/partners">

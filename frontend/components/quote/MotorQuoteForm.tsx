@@ -202,7 +202,7 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
         )}
         {errors.model?.message && <p className="text-xs text-status-error">Select or type the vehicle model</p>}
       </div>
-      <Input label="Year" type="number" {...register("year")} error={errors.year?.message} />
+      <Input label="Year of Manufacture" type="number" {...register("year")} error={errors.year?.message} />
       <Input label="Estimated value (KES)" type="number" {...register("value")} error={errors.value?.message} />
 
       <div className="flex flex-col gap-1.5">
@@ -215,7 +215,7 @@ export function MotorQuoteForm({ onSubmit, submitting }: { onSubmit: (v: MotorQu
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-ink">Cover type</label>
+        <label className="text-sm font-medium text-ink">Cover type required</label>
         <select {...register("cover_type")} className="rounded-control border border-neutral-border bg-white px-4 py-2.5 text-sm">
           <option value="comprehensive">Comprehensive</option>
           <option value="third_party">Third Party</option>

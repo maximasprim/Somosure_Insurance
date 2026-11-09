@@ -18,11 +18,11 @@ const publicSans = Public_Sans({
 export const metadata: Metadata = {
   title: "Somosure Insurance | Insurance Made Simpler",
   description:
-    "Compare, understand, buy and manage your insurance from one trusted platform.",
+    "Compare, buy and manage your insurance from one trusted platform.",
   metadataBase: new URL("https://somosure.co.ke"),
   openGraph: {
     title: "Somosure Insurance - Insurance made simpler",
-    description: "Compare, understand, buy and manage your insurance from one trusted platform.",
+    description: "Compare, buy and manage your insurance from one trusted platform.",
     url: "https://somosure.co.ke",
     siteName: "Somosure Insurance",
     locale: "en_KE",

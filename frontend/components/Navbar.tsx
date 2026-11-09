@@ -74,7 +74,7 @@ export function Navbar() {
             className="h-8 md:h-12 w-auto"
             priority
           />
-        <p className="relative z-10 -mt-2 -mr-3 self-end pr-0 text-xs leading-none text-ink-soft/70">Wealth.health.life</p>
+        <p className="relative z-10 -mt-2 -mr-1 self-end pr-0 text-xs leading-none text-ink-soft/70">Wealth.Health.Life</p>
         {/* <p className="text-xs text-ink-soft/70">Wealth.health.life</p> */}
         </Link>
 
