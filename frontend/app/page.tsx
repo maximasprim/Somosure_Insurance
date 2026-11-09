@@ -248,7 +248,7 @@ export default function HomePage() {
         <Reveal>
           <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-card bg-brand-tint/60 px-6 py-10 text-center md:flex-row md:justify-between md:text-left">
             <div>
-              <h2 className="text-xl font-bold md:text-2xl">Do you run a vehicle Dealership, SACCO, Bank, Agency?</h2>
+              <h2 className="text-xl font-bold md:text-2xl">Do you run a Vehicle Dealership, SACCO, Bank, Agency?</h2>
               <p className="mt-2 max-w-xl text-ink-soft">
                 Refer your customers to us and get rewarded.
               </p>
