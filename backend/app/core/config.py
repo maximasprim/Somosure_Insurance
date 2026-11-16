@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     #   off     - no screening at all (original behaviour).
     document_validation: str = "strict"
 
+    # Policies posted from the weekly report workbook are left out of the automatic renewal reminders (which can message
+    # customers) until this is switched on. Staff still see them on Sales -> Renewals either way.
+    workbook_renewal_reminders: bool = False
+
     # Who is alerted when someone applies to become a partner (comma-separated).
     # Emails go out through the SMTP account below, texts through the SMS
     # provider; with neither configured the alert is only logged and the

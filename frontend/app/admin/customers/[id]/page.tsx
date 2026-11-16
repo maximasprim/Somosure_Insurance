@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { AuditTimeline } from "@/components/AuditTimeline";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { WorkbookHistory } from "@/components/admin/sales/WorkbookHistory";
 import { api } from "@/lib/api";
 
 interface Contact {
@@ -90,7 +91,7 @@ export default function AdminCustomerDetailPage() {
   if (!customer) return <main className="mx-auto max-w-3xl px-6 py-12 text-ink-soft">Loading…</main>;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">{customer.full_name}</h1>
       <p className="mt-1 text-ink-soft">
         {customer.phone}
@@ -168,6 +169,8 @@ export default function AdminCustomerDetailPage() {
           {customer.communications.length === 0 && <p className="text-sm text-ink-soft">No communications logged yet.</p>}
         </div>
       </section>
+
+      <WorkbookHistory customerId={customer.id} />
 
       <section className="mt-10">
         <AuditTimeline customerId={customer.id} title="Audit trail for this customer" />

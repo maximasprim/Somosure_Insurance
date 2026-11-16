@@ -1,9 +1,10 @@
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.automation.engine import emit_event
+from app.core.config import get_settings
 from app.models.policy import Policy
 from app.models.renewal import REMINDER_DAYS_BEFORE_EXPIRY, Renewal, RenewalEvent
 
@@ -18,7 +19,12 @@ async def scan_renewals(db: AsyncSession) -> dict:
     today = date.today()
     reminders_sent = 0
 
-    active_policies = (await db.scalars(select(Policy).where(Policy.status == "active"))).all()
+    active_query = select(Policy).where(Policy.status == "active")
+    if not get_settings().workbook_renewal_reminders:
+        # Policies posted from the weekly report workbook are not reminded automatically until this is switched on
+        # (WORKBOOK_RENEWAL_REMINDERS=true): they would otherwise message customers who have never used the platform.
+        active_query = active_query.where(or_(Policy.source.is_(None), Policy.source != "workbook"))
+    active_policies = (await db.scalars(active_query)).all()
 
     for policy in active_policies:
         days_remaining = (policy.end_date - today).days

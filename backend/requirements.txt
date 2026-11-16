@@ -17,6 +17,8 @@ python-multipart==0.0.9
 redis==5.0.8
 httpx==0.27.2
 python-dateutil==2.9.0.post0
+# Reading and writing the weekly sales report workbook (app/services/sales_import).
+openpyxl>=3.1,<4
 slowapi==0.1.9
 sentry-sdk[fastapi]==2.14.0
 aiosmtplib==3.0.2

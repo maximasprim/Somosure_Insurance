@@ -2,11 +2,14 @@
 // dashboard (app/admin/page.tsx). The data comes from
 // GET /api/v1/admin/reports/analytics. Pure functions, no React.
 
+import type { WorkbookAnalytics } from "@/lib/salesSync";
+
 export const RANGE_OPTIONS = [
   { days: 7, label: "7 days" },
   { days: 30, label: "30 days" },
   { days: 90, label: "90 days" },
   { days: 365, label: "12 months" },
+  { days: 730, label: "24 months" },
 ] as const;
 
 export interface KpiValue {
@@ -85,6 +88,8 @@ export interface Analytics {
   stickers_by_status: NamedCount[];
   commissions_by_status: NamedCount[];
   referrals_by_status: NamedCount[];
+  /** Platform + weekly report workbook sales together; empty if the workbook tables are not set up yet. */
+  workbook?: Partial<WorkbookAnalytics>;
   /** Sections the server could not compute (the rest of the page still works). */
   unavailable: string[];
 }

@@ -14,6 +14,7 @@ interface SearchResults {
   claims: { id: string; reference: string; status: string }[];
   applications: { id: string; reference: string; status: string }[];
   payments: { id: string; reference: string; status: string }[];
+  workbook: { id: string; client_name: string; policy_number: string | null; reg_no: string | null; underwriter: string | null; expiry_date: string | null; customer_id: string | null }[];
 }
 
 const SECTIONS: { key: keyof SearchResults; label: string }[] = [
@@ -23,6 +24,7 @@ const SECTIONS: { key: keyof SearchResults; label: string }[] = [
   { key: "policies", label: "Policies" },
   { key: "claims", label: "Claims" },
   { key: "payments", label: "Payments" },
+  { key: "workbook", label: "Weekly report workbook" },
 ];
 
 export default function AdminSearchPage() {
@@ -66,7 +68,7 @@ export default function AdminSearchPage() {
         <div className="mt-6">
           <p className="mb-4 text-sm text-ink-soft">{totalResults} result{totalResults === 1 ? "" : "s"}</p>
           {SECTIONS.map(({ key, label }) => {
-            const items = results[key];
+            const items = results[key] ?? [];
             if (items.length === 0) return null;
             return (
               <div key={key} className="mb-6">
@@ -76,7 +78,9 @@ export default function AdminSearchPage() {
                     const card = (
                       <Card key={item.id} className="flex items-center justify-between">
                         <span className="font-mono text-sm">
-                          {item.reference ?? item.policy_number ?? item.full_name}
+                          {key === "workbook"
+                            ? [item.client_name, item.policy_number ?? item.reg_no].filter(Boolean).join(" · ")
+                            : (item.reference ?? item.policy_number ?? item.full_name)}
                           {item.phone && <span className="ml-2 font-sans text-ink-soft">{item.phone}</span>}
                         </span>
                         {item.status && <Badge tone="brand">{item.status.replace(/_/g, " ")}</Badge>}
@@ -84,6 +88,10 @@ export default function AdminSearchPage() {
                     );
                     return key === "customers" ? (
                       <Link key={item.id} href={`/admin/customers/${item.id}`}>
+                        {card}
+                      </Link>
+                    ) : key === "workbook" && item.customer_id ? (
+                      <Link key={item.id} href={`/admin/customers/${item.customer_id}`}>
                         {card}
                       </Link>
                     ) : (

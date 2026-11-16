@@ -33,6 +33,9 @@ import {
   CalendarClock,
   LifeBuoy,
   BookOpen,
+  FileSpreadsheet,
+  Receipt,
+  Contact,
 } from "lucide-react";
 import { clearSession, getTokenRole } from "@/lib/api";
 import Image from "next/image";
@@ -54,6 +57,7 @@ const SECTIONS: NavSection[] = [
     title: "Sales & CRM",
     items: [
       { label: "Leads", href: "/admin/leads", icon: Users },
+      { label: "Customers", href: "/admin/customers", icon: Contact },
       { label: "Applications", href: "/admin/applications", icon: FileText },
       { label: "Partners", href: "/admin/partners", icon: Handshake },
       { label: "Partner applications", href: "/admin/partner-applications", icon: Handshake },
@@ -77,6 +81,8 @@ const SECTIONS: NavSection[] = [
     items: [
       { label: "Payments", href: "/admin/payments", icon: CreditCard },
       { label: "Renewals", href: "/admin/renewals", icon: RefreshCw },
+      { label: "All sales", href: "/admin/sales", icon: Receipt },
+      { label: "Sales import", href: "/admin/sales-import", icon: FileSpreadsheet },
       { label: "Anniversaries", href: "/admin/anniversaries", icon: CalendarClock },
       { label: "Support tickets", href: "/admin/support", icon: LifeBuoy },
     ],

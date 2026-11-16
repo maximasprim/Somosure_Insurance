@@ -39,6 +39,7 @@ from app.models.referral import Referral
 from app.models.renewal import Renewal
 from app.models.sticker import Sticker
 from app.services.analytics_buckets import bucket_dates, bucket_unit, merge_trend, pct_change
+from app.services.sales_import import unified as workbook_sales
 
 logger = logging.getLogger("somosure.analytics")
 
@@ -239,6 +240,11 @@ async def get_analytics(db: AsyncSession, days: int) -> dict:
     )
     referrals_by_status = await safe("referrals_by_status", [], lambda: _grouped(db, Referral.status, Referral.created_at >= start))
 
+    # Platform + weekly-report-workbook sales together. Additive: every figure above is unchanged and still
+    # means "sold through the platform"; this section is "all sales" and is empty if the workbook tables
+    # are not there yet.
+    workbook = await safe("workbook", {}, lambda: workbook_sales.analytics_section(db, start, now, previous_start))
+
     return {
         "range_days": days,
         "bucket": unit,
@@ -264,6 +270,7 @@ async def get_analytics(db: AsyncSession, days: int) -> dict:
         "stickers_by_status": stickers_by_status,
         "commissions_by_status": commissions_by_status,
         "referrals_by_status": referrals_by_status,
+        "workbook": workbook,
         "unavailable": unavailable,
     }
 

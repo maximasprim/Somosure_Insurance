@@ -5,6 +5,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { AdminQuickLinks } from "@/components/admin/AdminQuickLinks";
+import { AllSalesSection } from "@/components/admin/analytics/AllSalesSection";
 import {
   ActivityTrend,
   AttentionStrip,
@@ -202,6 +203,8 @@ export default function AdminAnalyticsPage() {
               <Donut rows={data.quotes_by_category} />
             </Panel>
           </div>
+
+          <AllSalesSection data={data.workbook} />
 
           <SectionTitle>Payments &amp; channels</SectionTitle>
           <div className="mt-3 grid gap-4 lg:grid-cols-3">
