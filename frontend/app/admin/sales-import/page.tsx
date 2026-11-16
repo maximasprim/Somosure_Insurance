@@ -62,7 +62,7 @@ export default function AdminSalesImportPage() {
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-3 py-4">
+    <main className="mx-auto max-w-8xl px-3 py-4">
       <h1 className="text-2xl font-bold">Sales import</h1>
       <p className="mt-1 text-ink-soft">
         Bring the weekly report workbook into the system and keep the two in step. Upload the whole workbook each time - only what changed is applied.
