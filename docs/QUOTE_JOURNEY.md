@@ -19,6 +19,26 @@ What was added, where it lives, and how to switch parts off.
 | No-deposit financing approval creates a staff task to issue the policy | `_flag_zero_deposit_approval` in `financing_service.py` | - |
 | Optional company-applicant deposit/rate (blank = standard) | migration `0020`, `corporate_*` settings, `is_corporate` on eligibility | admin financing settings page, `FinancingOption.tsx` |
 
+## Add-ons and excess protectors: instant totals
+
+On the motor quote page each insurer lists its add-ons and excess protectors as tick boxes. Ticking or unticking one changes the
+total **at once**, with no wait for the server, and the page then confirms the price in the background.
+
+* **How the instant figure is worked out** (`frontend/lib/quotePricing.ts`): the quote's premium already includes whatever the server
+  priced in, so the page takes those options back out, adds what is ticked now, charges each levy rate on that premium rounded to the
+  cent (halves up), and adds the flat fee. It uses whole cents, never floating-point money, so it matches the server to the cent.
+* **The rates are not written in the page.** The server publishes them with every rate-card quote as `coverage.pricing_rules`
+  (`levy_rates`, `flat_fees`, taken from `rate_card_engine.py`), so changing a levy there changes the page too. A quote without
+  `pricing_rules` (any insurer that is not a rate card) keeps the old behaviour: the price updates when the server answers.
+* **The server's price always wins.** About 0.2 s after the last tick the page asks the server to re-price (one request for a burst of
+  ticks) and replaces the instant figure with the server's. If that fails, the ticks go back to the last confirmed prices and the
+  error is shown - an unconfirmed price is never left on screen.
+* **Select is locked until the price is confirmed**, because a re-price creates new quote records and choosing the old one would
+  buy the cover without the ticked option. Only the newest request counts; a slow older answer is ignored.
+* **Display note:** totals are shown in whole shillings (`KES 33,389`), as before; the cents are in the stored quote.
+
+Tests: `tests/test_quote_live_pricing.py` makes the server prove the published figures reproduce its own totals for every option.
+
 ## Settings (backend `.env`)
 - `DOCUMENT_VALIDATION=strict|lenient|off` - strict refuses junk, lenient keeps it flagged `needs_review`, off = old behaviour.
 - `ALLOW_DEMO_QUOTE_CATEGORIES=false` - set `true` on staging to let the demo insurers' quotes through for every category.

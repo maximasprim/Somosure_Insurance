@@ -27,7 +27,13 @@ from app.providers.base import (
     NormalizedQuote,
     PolicyResult,
 )
-from app.services.rate_card_engine import RateCardNotConfigured, compute_motor_premium
+from app.services.rate_card_engine import (
+    PHCF_RATE,
+    STAMP_DUTY,
+    TRAINING_LEVY_RATE,
+    RateCardNotConfigured,
+    compute_motor_premium,
+)
 
 
 class RateCardAdapter(InsuranceProviderAdapter):
@@ -80,6 +86,13 @@ class RateCardAdapter(InsuranceProviderAdapter):
             # Everything else on offer (incl. excess protectors), priced for this vehicle, so the quote
             # page can let the customer tick or untick what they want.
             coverage["optional_extensions"] = breakdown.optional_extensions
+        # How `total` is built from `premium` (base + chosen extras): each rate is charged on the premium and rounded to
+        # the cent, then the flat fee is added. Published so the quote page can show the new total the instant an extra
+        # is ticked, with the same sums as the server (the server's own total still wins once it answers).
+        coverage["pricing_rules"] = {
+            "levy_rates": [str(PHCF_RATE), str(TRAINING_LEVY_RATE)],
+            "flat_fees": str(STAMP_DUTY),
+        }
         if breakdown.assumptions:
             coverage["assumptions"] = breakdown.assumptions
         if breakdown.data_confidence != "verified":

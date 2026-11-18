@@ -28,7 +28,7 @@ from app.audit.context import record_event
 from app.models.policy import Policy
 from app.models.provider import InsuranceProvider
 from app.models.sales_ledger import ImportAlias, ImportBatch, IpfRemittance, LegacyClaim, SalesEntry
-from app.services.sales_import import posting, unified
+from app.services.sales_import import posting, unified, versions
 from app.services.sales_import.cleaners import MONTH_NAMES, StaffResolver, norm_text, resolve_underwriter
 from app.services.sales_import.export import build_cleaned_workbook
 from app.services.sales_import.parser import WorkbookError, parse_workbook
@@ -132,7 +132,11 @@ def _counts(plan: SyncPlan) -> dict[str, int]:
 
 
 async def run_import(db: AsyncSession, *, filename: str | None, data: bytes, dry_run: bool, user_id: str | None,
-                     period_from: str | None = None, period_to: str | None = None, post: bool = False) -> dict[str, Any]:
+                     period_from: str | None = None, period_to: str | None = None, post: bool = False,
+                     source: str = "manual", reverted_to: uuid.UUID | None = None, unpost_missing: bool = False,
+                     note: str | None = None) -> dict[str, Any]:
+    """`source` records where the file came from (manual | google_sheet | revert) in the version history. A revert
+    passes `unpost_missing=True` so the records posted for rows that the restored file does not contain are removed."""
     try:
         start, end = parse_period(period_from), parse_period(period_to)
     except ValueError as exc:
@@ -195,6 +199,12 @@ async def run_import(db: AsyncSession, *, filename: str | None, data: bytes, dry
     report["period"] = {"from": period_from or None, "to": period_to or None, "skipped": skipped}
     report["customer_links"] = None
     report["already_imported"] = bool(await db.scalar(select(func.count()).select_from(ImportBatch).where(ImportBatch.file_sha256 == sha)))
+    # Rows that would go missing and already have records posted for them: what a revert would remove again.
+    report["missing_posted"] = 0
+    for chunk in _chunks(plans["sales"].missing_ids, 500):
+        report["missing_posted"] += int(await db.scalar(
+            select(func.count()).select_from(SalesEntry).where(SalesEntry.id.in_(chunk), SalesEntry.posted_at.is_not(None))
+        ) or 0)
 
     if dry_run:
         return report
@@ -211,6 +221,13 @@ async def run_import(db: AsyncSession, *, filename: str | None, data: bytes, dry
     )
     db.add(batch)
     await db.flush()
+
+    version = await versions.snapshot(
+        db, batch_id=batch.id, data=data, sha=sha, filename=filename, source=source, period_from=period_from, period_to=period_to,
+        counts=batch.counts, user_id=user_id, reverted_to=reverted_to, note=note,
+    )
+    report["version_no"] = version.version_no
+    report["version_id"] = str(version.id)
 
     await _apply(db, batch.id, rw, plans)
     await _save_aliases(db, rw)
@@ -229,9 +246,10 @@ async def run_import(db: AsyncSession, *, filename: str | None, data: bytes, dry
     report["posting"] = None
     try:
         async with db.begin_nested():
+            unposted = await posting.unpost_entries(db, plans["sales"].missing_ids) if unpost_missing else None
             synced = await posting.resync_posted(db, commit=False)
             posted = await posting.post_ready(db, dry_run=False, commit=False) if post else None
-        report["posting"] = {"resynced": synced, "posted": posted}
+        report["posting"] = {"resynced": synced, "posted": posted, "unposted": unposted}
     except Exception:
         logger.exception("Posting to the system failed; the import itself is unaffected")
         report["posting"] = {"error": "Posting to the system did not complete - the ledger was imported. Run it again from the Post to system tab."}

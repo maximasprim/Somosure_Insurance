@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { QuoteFlowSteps } from "@/components/QuoteFlowSteps";
@@ -29,6 +29,7 @@ type Step = "form" | "compare" | "documents" | "awaiting_approval" | "payment" |
 export default function MotorQuotePage() {
   const [step, setStep] = useState<Step>("form");
   const [submitting, setSubmitting] = useState(false);
+  const customiseSeq = useRef(0); // numbers the add-on re-pricing requests so only the newest one counts
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<QuoteRequestResult | null>(null);
   const [application, setApplication] = useState<ApplicationResult | null>(null);
@@ -107,9 +108,12 @@ export default function MotorQuotePage() {
     }
   }
 
-  // Re-prices the same vehicle and driver answers with the add-ons / excess protectors the customer ticked.
-  async function handleCustomise(extensions: string[]) {
-    if (!lastAnswers) return;
+  // Re-prices the same vehicle and driver answers with the add-ons / excess protectors the customer ticked. The quote
+  // page already shows the new total; this brings back the server's own figures (and the new quote records that
+  // choosing a quote needs). Only the latest request counts: an older, slower answer must not overwrite a newer tick.
+  async function handleCustomise(extensions: string[]): Promise<"ok" | "failed" | "superseded"> {
+    if (!lastAnswers) return "failed";
+    const mine = ++customiseSeq.current;
     setSubmitting(true);
     setError(null);
     try {
@@ -119,13 +123,17 @@ export default function MotorQuotePage() {
         answers,
         referral_code: getStoredReferral(),
       });
+      if (mine !== customiseSeq.current) return "superseded";
       setResult(res);
       setLastAnswers(answers);
       if (res.customer_id) setCustomerId(res.customer_id);
+      return "ok";
     } catch (e) {
+      if (mine !== customiseSeq.current) return "superseded";
       setError(e instanceof Error ? e.message : "Could not update your prices");
+      return "failed";
     } finally {
-      setSubmitting(false);
+      if (mine === customiseSeq.current) setSubmitting(false);
     }
   }
 

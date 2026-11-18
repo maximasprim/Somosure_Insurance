@@ -4,7 +4,8 @@ import clsx from "clsx";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import type { ExcessLine, NormalizedQuote, OptionalExtension } from "@/lib/types";
+import { differsFromPriced, livePrice, optionsOf } from "@/lib/quotePricing";
+import type { ExcessLine, NormalizedQuote } from "@/lib/types";
 
 function formatKES(amount: string) {
   return `KES ${Number(amount).toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
@@ -17,11 +18,6 @@ function pricedCodes(quotes: NormalizedQuote[]): Set<string> {
     for (const o of optionsOf(q)) if (o.selected) codes.add(o.code);
   }
   return codes;
-}
-
-function optionsOf(q: NormalizedQuote): OptionalExtension[] {
-  const raw = (q.coverage as { optional_extensions?: unknown }).optional_extensions;
-  return Array.isArray(raw) ? (raw as OptionalExtension[]) : [];
 }
 
 function excessesOf(q: NormalizedQuote): ExcessLine[] {
@@ -76,35 +72,50 @@ export function QuoteComparison({
   quotes: NormalizedQuote[];
   note: string | null;
   onSelect: (quote: NormalizedQuote) => void;
-  /** When given, each quote shows its add-ons and excess protectors as tick boxes; ticking one re-prices with the chosen codes. */
-  onCustomise?: (extensions: string[]) => void;
+  /**
+   * When given, each quote shows its add-ons and excess protectors as tick boxes. Ticking one shows the new total at
+   * once and re-prices with the chosen codes in the background. It resolves "ok" once the server's prices are in,
+   * "failed" if they could not be fetched, or "superseded" if a newer tick took over.
+   */
+  onCustomise?: (extensions: string[]) => Promise<"ok" | "failed" | "superseded">;
   busy?: boolean;
 }) {
   const applied = pricedCodes(quotes);
   const [picked, setPicked] = useState<Set<string>>(applied);
-  // New prices came back (or a different set of quotes): the boxes follow what was actually priced.
-  useEffect(() => {
-    setPicked(pricedCodes(quotes));
-  }, [quotes]);
-  // Ticking a box re-prices straight away. A short pause lets several quick ticks go out as ONE request.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // New prices came back (or a different set of quotes): the boxes follow what was actually priced - unless a
+  // newer tick is still waiting to be sent, which those prices do not know about yet.
+  useEffect(() => {
+    if (!timer.current) setPicked(pricedCodes(quotes));
+  }, [quotes]);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
     },
     []
   );
+  // Ticking shows the new total at once. A short pause lets several quick ticks go out as ONE request to the server.
   function toggle(code: string) {
     const next = new Set(picked);
     if (next.has(code)) next.delete(code);
     else next.add(code);
     setPicked(next);
     if (!onCustomise) return;
-    if (timer.current) clearTimeout(timer.current);
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
     const unchanged = next.size === applied.size && [...next].every((c) => applied.has(c));
-    if (unchanged) return;
-    timer.current = setTimeout(() => onCustomise([...next]), 300);
+    if (unchanged && !busy) return; // back to what is already priced and nothing in flight: nothing to ask
+    timer.current = setTimeout(async () => {
+      timer.current = null;
+      const outcome = await onCustomise([...next]);
+      // The server could not confirm: go back to the prices that were confirmed rather than show an unconfirmed one.
+      if (outcome === "failed") setPicked(applied);
+    }, 200);
   }
+  // The ticks and the server's prices agree, and nothing is being fetched: only then can a quote be chosen.
+  const settled = !busy && !timer.current && picked.size === applied.size && [...picked].every((c) => applied.has(c));
 
   if (quotes.length === 0) {
     return (
@@ -114,17 +125,19 @@ export function QuoteComparison({
     );
   }
 
-  const cheapest = quotes.reduce((min, q) => (Number(q.total) < Number(min.total) ? q : min), quotes[0]);
+  // What each quote costs with what is ticked right now (the server's figure until a tick changes it).
+  const shown = (q: NormalizedQuote) => (onCustomise && differsFromPriced(q, picked) ? livePrice(q, picked) : null) ?? q;
+  const cheapest = quotes.reduce((min, q) => (Number(shown(q).total) < Number(shown(min).total) ? q : min), quotes[0]);
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {note && <div className="rounded-control bg-brand-tint px-4 py-3 text-sm text-ink">{note}</div>}
-      {onCustomise && busy && (
+      {onCustomise && !settled && (
         <div
           className="rounded-control border border-brand/60 bg-brand-tint/60 px-4 py-2 text-sm text-ink"
           role="status"
         >
-          Updating your prices…
+          Confirming your prices…
         </div>
       )}
       <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -165,9 +178,9 @@ export function QuoteComparison({
               </div>
 
               <div>
-                <p className="font-display text-3xl font-extrabold text-ink">{formatKES(q.total)}</p>
+                <p className="font-display text-3xl font-extrabold text-ink">{formatKES(shown(q).total)}</p>
                 <p className="mt-0.5 text-xs text-ink-soft">
-                  Premium {formatKES(q.premium)} · Taxes {formatKES(q.taxes)} · Fees {formatKES(q.fees)}
+                  Premium {formatKES(shown(q).premium)} · Taxes {formatKES(shown(q).taxes)} · Fees {formatKES(shown(q).fees)}
                 </p>
                 {singleExcess && <p className="mt-1.5 text-sm text-ink-soft">Excess: {singleExcess}</p>}
               </div>
@@ -215,7 +228,6 @@ export function QuoteComparison({
                                 type="checkbox"
                                 className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-neutral-border accent-brand-deep"
                                 checked={picked.has(o.code)}
-                                disabled={busy}
                                 onChange={() => toggle(o.code)}
                               />
                               <span className="min-w-0 flex-1 break-words text-sm text-ink">
@@ -275,7 +287,7 @@ export function QuoteComparison({
                     {q.payment_options.plans.length} ways to pay, including instalments. You choose on the next step.
                   </p>
                 )}
-                <Button onClick={() => onSelect(q)} disabled={busy} className="w-full">
+                <Button onClick={() => onSelect(q)} disabled={busy || (Boolean(onCustomise) && !settled)} className="w-full">
                   Continue with this quote
                 </Button>
               </div>

@@ -5,6 +5,7 @@ Jobs (each is an existing function that is safe to run repeatedly):
   abandoned_quotes    scan_abandoned_quotes      recovery nudge after 4 hours
   automations         run_due_automations        executes scheduled automation actions
   payments_reconcile  reconcile_pending_payments settles M-Pesa payments with a lost callback
+  sales_import        run_due_sales_import       pulls the Google Sheet into the ledger when it is due
 
 Three ways to trigger them, all safe to combine:
   1. the in-process loop (SCHEDULER_ENABLED=true) started with the web app;
@@ -33,6 +34,7 @@ from app.models.scheduled_job import ScheduledJob
 from app.services.payment_service import reconcile_pending_payments
 from app.services.quote_recovery_service import scan_abandoned_quotes
 from app.services.renewal_service import scan_renewals
+from app.services.sales_import.auto_import import run_due_sales_import
 
 logger = logging.getLogger("somosure.scheduler")
 
@@ -52,6 +54,8 @@ JOBS: tuple[Job, ...] = (
     # Reminders are idempotent per policy per day-bucket, so running every few hours
     # is safe and means a restart or an outage on the "right" day doesn't skip a reminder.
     Job("renewals", scan_renewals, every=timedelta(hours=6), lease=timedelta(minutes=15)),
+    # Pulls the Google Sheet when Admin -> Sales import -> Automation says it is due (a cheap check otherwise).
+    Job("sales_import", run_due_sales_import, every=timedelta(minutes=10), lease=timedelta(minutes=30)),
 )
 
 

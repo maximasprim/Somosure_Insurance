@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { AutomationPanel } from "@/components/admin/salesImport/AutomationPanel";
 import { ClaimsIpfPanel } from "@/components/admin/salesImport/ClaimsIpfPanel";
 import { ImportPanel } from "@/components/admin/salesImport/ImportPanel";
 import { LedgerPanel } from "@/components/admin/salesImport/LedgerPanel";
@@ -9,9 +10,12 @@ import { NamesPanel } from "@/components/admin/salesImport/NamesPanel";
 import { PostingPanel } from "@/components/admin/salesImport/PostingPanel";
 import { SuggestionsPanel } from "@/components/admin/salesImport/SuggestionsPanel";
 import { SummaryPanel } from "@/components/admin/salesImport/SummaryPanel";
+import { VersionsPanel } from "@/components/admin/salesImport/VersionsPanel";
 
 const TABS = [
   { id: "import", label: "Import" },
+  { id: "auto", label: "Automation" },
+  { id: "versions", label: "Versions" },
   { id: "post", label: "Post to system" },
   { id: "ledger", label: "Ledger" },
   { id: "summary", label: "Summary" },
@@ -46,6 +50,10 @@ export default function AdminSalesImportPage() {
     switch (id) {
       case "import":
         return <ImportPanel onImported={refresh} />;
+      case "auto":
+        return <AutomationPanel refreshKey={refreshKey} onImported={refresh} />;
+      case "versions":
+        return <VersionsPanel refreshKey={refreshKey} onReverted={refresh} />;
       case "post":
         return <PostingPanel refreshKey={refreshKey} onPosted={refresh} />;
       case "ledger":

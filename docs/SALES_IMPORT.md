@@ -197,6 +197,63 @@ policies. Workbook policies are not reminded automatically - the worklist shows 
 to contact them from your own phone. A workbook policy drops off the list when the same registration has a later
 policy in the sheet, or when it is marked renewed or lost.
 
+## Automatic import from Google Sheets (Sales import -> Automation)
+
+Instead of uploading the workbook each week, point the system at the Google Sheet and let it pull the sheet itself.
+
+**Setting it up.** Open the sheet in Google Sheets -> Share -> General access -> *Anyone with the link* -> Viewer. Paste the sheet's
+address on the **Automation** tab, choose how often (every day / week / month), the day and the hour (Nairobi time), tick *Import
+automatically* and Save. **Run now** pulls it immediately without waiting. Optional: the same *Import from / Up to* period as the Import
+tab, and *Also post new rows into the system* (off by default, so nothing is posted until you have looked at it).
+
+**What a run does.** It downloads the whole sheet as a workbook and imports it exactly like an upload (same checks, same period rule,
+same "only what changed is applied"). If the sheet is identical to the last import, or would change nothing, the run is logged as *No
+changes* and **no version is created**, so the history only holds real changes. Every attempt - imported, no changes, or failed - is
+listed under *Recent attempts*.
+
+**When it fails** (sheet made private, Google unreachable, file not a workbook) nothing is changed, the reason is shown in plain words on
+the tab, and it is retried every 6 hours up to 3 times before waiting for the normal slot.
+
+**Only a Google Sheet that anyone with the link can view works.** A sheet restricted to named people needs a Google login the system does
+not have; the tab says so. Only the sheet's id is taken from the pasted link - the address that is fetched is always built by the system,
+so the link box cannot be used to make the server call some other address.
+
+### Running it on a schedule (deployment)
+
+The pull is a background job named `sales_import` that checks every 10 minutes whether one is due (cheap when it is not). It runs when
+`SCHEDULER_ENABLED=true`, or when an outside timer calls `POST /api/v1/internal/cron/run` (header `X-Cron-Secret`) - on a host that
+sleeps when idle use the second, e.g. every 10 minutes, optionally with `?jobs=sales_import`. If neither is set up the Automation tab
+will show a "Next import" time that never arrives - check *Last attempt* after the first scheduled time.
+Run `alembic -c app/db/alembic.ini upgrade head` (migration `0037`) before using the tab.
+
+## Versions and reverting (Sales import -> Versions)
+
+Every committed import - by hand, from Google Sheets, or a revert - becomes a numbered **version**, and the exact workbook file is kept
+in document storage (the same storage as uploaded documents; each distinct file is stored once). The tab lists them with date, source,
+who, what it changed, and **Download** (the original file).
+
+**Revert to this** puts the ledger back to what that version's workbook says. It opens a preview first - how many rows are set back, how
+many will be marked *not in sheet*, how many posted policies will be removed - and asks for an optional reason (kept on the version and
+in the audit trail). Then:
+
+* rows whose values changed since that version are set back to what it says;
+* rows that did not exist in that version are marked *not in sheet* (the ledger never deletes), and the policy, payment, quote and
+  application posting made for them are removed again (a policy that staff have since added a claim or renewal to is kept, and counted);
+* the revert is recorded as a **new version** - history is never rewritten, so a revert can itself be reverted;
+* **automatic import is paused**, because otherwise the next pull would bring today's sheet straight back. Resume it on the Automation
+  tab once the Google Sheet matches what you restored.
+
+**Not touched by a revert:** sales recorded by hand in the system, staff follow-up notes, accepted date fixes that still apply, name
+aliases and underwriter links, claims and documents added in the app, the platform's own policies, and customers created by posting
+(they stay, and are relinked by the next import if needed). Reverting needs super admin or management; finance can view and download.
+
+**Limits.** A revert restores the *ledger and what posting made from it*; it does not restore the Google Sheet itself (use the sheet's own
+version history for that). Reverting to a version imported with a period limit restores only that period. Stored workbooks are never
+deleted automatically, so storage grows by one file per real change.
+
+Code: `services/sales_import/google_sheet.py` (download), `schedule.py` (when), `auto_import.py` (settings, runs, revert),
+`versions.py` (history and stored files); API in `api/v1/admin_sales_import_auto.py`; tests in `tests/test_sales_import_automation.py`.
+
 ## Known limits
 
 * Phone numbers are only in the 2023-2024 sheets; without them the renewals list shows "no phone in the sheet".

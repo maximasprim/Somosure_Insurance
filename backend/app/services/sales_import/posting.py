@@ -537,6 +537,32 @@ async def unpost(db: AsyncSession, *, dry_run: bool = True) -> dict[str, Any]:
     return {"dry_run": False, "policies_removed": removed, "policies_kept": kept, "customers_removed": deleted_customers}
 
 
+async def unpost_entries(db: AsyncSession, entry_ids: list) -> dict[str, int]:
+    """Removes the records posted for these ledger rows only (used when a revert puts back an older workbook that does
+    not contain them). Same rules as `unpost`: only policies posting created; a policy that staff have since added a
+    claim or renewal to is kept and counted, never forced. Customers are left alone. Runs inside the caller's
+    transaction - nothing is committed here."""
+    removed = kept = 0
+    for ids in _chunks(list(entry_ids), 500):
+        posted = (await db.execute(
+            select(SalesEntry.id, SalesEntry.policy_id, SalesEntry.quote_id, SalesEntry.quote_request_id, SalesEntry.application_id, SalesEntry.payment_id)
+            .join(Policy, Policy.id == SalesEntry.policy_id)
+            .where(SalesEntry.id.in_(ids), SalesEntry.posted_at.is_not(None), Policy.source == "workbook")
+        )).all()
+        for chunk in _chunks(posted, 100):
+            done = await _unpost_chunk(db, chunk)
+            if done is None:  # something refers to one of them: go one by one
+                for single in chunk:
+                    ok = await _unpost_chunk(db, [single])
+                    removed += 1 if ok else 0
+                    kept += 0 if ok else 1
+            else:
+                removed += done
+    if removed or kept:
+        record_event("sales_import.unpost_entries", summary=f"Removed {removed} posted policies for rows no longer in the sheet", removed=removed, kept=kept)
+    return {"removed": removed, "kept": kept}
+
+
 async def _unpost_chunk(db: AsyncSession, chunk: list) -> int | None:
     """Removes the posted records for these ledger rows. Returns how many, or None if something refers to them."""
     entry_ids = [r.id for r in chunk]

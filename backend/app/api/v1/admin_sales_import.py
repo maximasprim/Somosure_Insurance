@@ -20,7 +20,7 @@ from app.schemas.sales_import import (
     LegacyClaimOut,
     SalesEntryPage,
 )
-from app.services.sales_import import service
+from app.services.sales_import import service, versions
 from app.services.sales_import.parser import WorkbookError
 
 ROLES = ("super_admin", "management", "finance_officer")
@@ -54,6 +54,9 @@ async def upload_workbook(
         )
     except WorkbookError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except versions.VersionError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 @router.get("/batches", response_model=list[ImportBatchOut])

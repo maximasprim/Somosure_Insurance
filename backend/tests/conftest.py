@@ -36,6 +36,18 @@ TEST_DATABASE_URL = os.environ.get(
 )
 
 
+@pytest.fixture(autouse=True)
+def sales_workbook_storage(tmp_path, monkeypatch):
+    """Imported workbooks are kept for the version history. The project's .env may hold real Supabase credentials, so
+    without this every import in the suite would try to write to the real bucket; tests use a temp folder instead."""
+    from app.core.storage import LocalDiskStorage
+    from app.services.sales_import import versions
+
+    storage = LocalDiskStorage(str(tmp_path / "workbooks"))
+    monkeypatch.setattr(versions, "get_storage", lambda: storage)
+    return storage
+
+
 @pytest.fixture
 async def engine():
     eng = create_async_engine(TEST_DATABASE_URL)
