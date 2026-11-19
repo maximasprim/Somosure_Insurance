@@ -39,6 +39,9 @@ class DocumentSpec:
     # number just like a logbook does, so without this it would be accepted in
     # the logbook slot.
     excluded_phrases: tuple[str, ...] = field(default=(), repr=False)
+    # An optional document is asked for and shown, but the application can be submitted without it. Only the valuation
+    # report is optional: without one, comprehensive cover starts as a one-month sticker (see provisional_cover.py).
+    optional: bool = False
 
 
 NATIONAL_ID = DocumentSpec(
@@ -86,12 +89,16 @@ VALUATION_REPORT = DocumentSpec(
     label="Vehicle valuation report",
     description=(
         "A valuation report for the vehicle from a motor valuer (for example the one done for a bank or financier). "
-        "Comprehensive cover is priced on what the vehicle is worth, so we need it to confirm the value insured."
+        "Comprehensive cover is priced on what the vehicle is worth, so an annual comprehensive policy needs it. "
+        "You can continue without it: you will then get a one-month comprehensive sticker, priced on the value you "
+        "entered, while you get the report."
     ),
     tips=(
         "It must show the vehicle's market value and registration number.",
         "Upload the whole report as one PDF - the pages with the vehicle photos are fine to include.",
+        "No report yet? Carry on - you can upload it from your dashboard within the month to move to annual cover.",
     ),
+    optional=True,
     keyword_groups=(
         ("valuation report", "valuation certificate", "bank valuation", "valuers", "valuer"),
         ("market value",),
@@ -228,6 +235,7 @@ def spec_to_dict(spec: DocumentSpec) -> dict:
         "description": spec.description,
         "tips": list(spec.tips),
         "system_provided": spec.type in SYSTEM_PROVIDED_TYPES,
+        "optional": spec.optional,
     }
 
 

@@ -1,14 +1,15 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.security import get_current_claims, require_roles
 from app.models.customer import Customer
 from app.models.payment import Payment
-from app.models.policy import Policy
+from app.models.policy import Policy, PolicyEvent
 from app.models.provider import InsuranceProvider
 from app.models.renewal import Renewal
 from app.models.support import SupportTicket
@@ -38,6 +39,7 @@ policies_router = APIRouter(
 async def list_policies(
     status_filter: str | None = Query(None, alias="status"),
     search: str | None = Query(None, min_length=1),
+    valuation_pending: bool | None = Query(None, description="true = only one-month covers still waiting for the valuation report"),
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
 ):
@@ -48,28 +50,67 @@ async def list_policies(
     )
     if status_filter:
         stmt = stmt.where(Policy.status == status_filter)
+    if valuation_pending is not None:
+        stmt = stmt.where(Policy.valuation_pending.is_(valuation_pending))
     if search:
         like = f"%{search}%"
         stmt = stmt.where(or_(Policy.policy_number.ilike(like), Customer.full_name.ilike(like)))
     stmt = stmt.order_by(Policy.created_at.desc()).limit(limit)
 
     rows = (await db.execute(stmt)).all()
-    return [
-        PolicyListOut(
-            id=policy.id,
-            policy_number=policy.policy_number,
-            customer_name=customer_name,
-            provider_name=provider_name,
-            status=policy.status,
-            payment_status=policy.payment_status,
-            premium=policy.premium,
-            start_date=policy.start_date,
-            end_date=policy.end_date,
-            is_mock=policy.is_mock,
-            created_at=policy.created_at,
+    return [_policy_row(policy, customer_name, provider_name) for policy, customer_name, provider_name in rows]
+
+
+def _policy_row(policy: Policy, customer_name: str, provider_name: str) -> PolicyListOut:
+    return PolicyListOut(
+        id=policy.id,
+        policy_number=policy.policy_number,
+        customer_name=customer_name,
+        provider_name=provider_name,
+        status=policy.status,
+        payment_status=policy.payment_status,
+        premium=policy.premium,
+        start_date=policy.start_date,
+        end_date=policy.end_date,
+        is_mock=policy.is_mock,
+        created_at=policy.created_at,
+        valuation_pending=policy.valuation_pending,
+        valuation_due=policy.valuation_due,
+    )
+
+
+@policies_router.post("/{policy_id}/valuation-received", response_model=PolicyListOut)
+async def valuation_received(policy_id: uuid.UUID, db: AsyncSession = Depends(get_db), claims: dict = Depends(get_current_claims)):
+    """Marks a one-month cover as no longer waiting for its valuation report (the customer's upload, or one staff
+    obtained). It only clears the flag and records who did it: the premium is NOT changed and no further sticker is
+    issued here - staff do the reconciliation themselves."""
+    row = (
+        await db.execute(
+            select(Policy, Customer.full_name, InsuranceProvider.name)
+            .join(Customer, Customer.id == Policy.customer_id)
+            .join(InsuranceProvider, InsuranceProvider.id == Policy.provider_id)
+            .where(Policy.id == policy_id)
         )
-        for policy, customer_name, provider_name in rows
-    ]
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    policy, customer_name, provider_name = row
+    if not policy.valuation_pending:
+        raise HTTPException(status_code=409, detail="This policy is not waiting for a valuation report.")
+    policy.valuation_pending = False
+    policy.valuation_received_at = datetime.now(timezone.utc)
+    db.add(
+        PolicyEvent(
+            policy_id=policy.id,
+            event_type="valuation_received",
+            from_status=policy.status,
+            to_status=policy.status,
+            metadata_json={"marked_by": claims.get("sub")},
+        )
+    )
+    await db.commit()
+    await db.refresh(policy)
+    return _policy_row(policy, customer_name, provider_name)
 
 
 # --- Payments -------------------------------------------------------------

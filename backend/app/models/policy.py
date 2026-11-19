@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, JSON, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, JSON, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,15 @@ class Policy(Base):
 
     is_mock: Mapped[bool] = mapped_column(default=True)
     # Mirrors the quote's is_mock flag - never present a mock policy as real.
+
+    # Comprehensive cover issued without a valuation report (see services/provisional_cover.py): the premium was worked
+    # out on the value the customer entered and only a one-month sticker was issued, until the report arrives and the
+    # premium is reconciled. `valuation_due` is the last day of that first sticker; `provisional_vehicle` is the normalised
+    # registration number, kept so a vehicle cannot be given a second one-month cover while this one is outstanding.
+    valuation_pending: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    valuation_due: Mapped[date | None] = mapped_column(Date, nullable=True)
+    valuation_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provisional_vehicle: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

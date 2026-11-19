@@ -39,6 +39,31 @@ total **at once**, with no wait for the server, and the page then confirms the p
 
 Tests: `tests/test_quote_live_pricing.py` makes the server prove the published figures reproduce its own totals for every option.
 
+## Comprehensive cover without a valuation report (one-month sticker)
+
+The valuation report is **optional**. An annual comprehensive policy needs it, but a customer who does not have it yet can carry on:
+
+* **Documents:** the report is listed as *Optional* (quote page and upload step) with a plain notice of what happens without it. Submit only waits for
+  the required documents. (`DocumentSpec.optional` in `document_requirements.py`; the checklist's `complete` ignores optional items and lists
+  them under `optional_missing`.)
+* **Price:** unchanged. The customer pays the amount on the quote, which is based on the vehicle value they entered. Nothing is repriced
+  automatically; the premium is reconciled by staff once the real report arrives.
+* **Policy and sticker:** when the payment issues the policy, a comprehensive application with no accepted valuation report is flagged
+  `valuation_pending` (with `valuation_due` = the last day of the first month) and only a **one-month sticker** is issued
+  (`services/provisional_cover.py`, `policy_service.issue_policy`). The policy itself is still the annual one. A rejected report does not count.
+  Third-party cover and every other product are unaffected.
+* **One per vehicle:** submitting without a report is refused (409, with a message the customer sees) if that registration number
+  (spaces and case ignored) already has a one-month cover still waiting for its report. Applying *with* the report is the way out. A cancelled
+  policy, or one whose report has been marked received, does not block.
+* **Customer:** the dashboard policy card shows a "One-month sticker - valid to ..." notice with an *Upload valuation report* button. It uploads
+  to the policy's own application (`PolicyOut.application_id`), where staff see it.
+* **Staff:** Admin -> Policies shows a *Valuation pending* badge, a *Waiting for valuation report* filter (`?valuation_pending=true`), and a
+  *Valuation received* button (`POST /api/v1/admin/policies/{id}/valuation-received`). That button **only clears the flag** and records who did
+  it - it does not change the premium or issue a further sticker. Reconciling the premium and issuing the rest of the cover are manual steps.
+
+Not built (by choice): automatic reminders before the month ends, premium reconciliation, and issuing the remaining sticker automatically.
+Migration `0038` adds four columns to `policies` (all defaulted or nullable). Tests: `tests/test_provisional_cover.py`.
+
 ## Settings (backend `.env`)
 - `DOCUMENT_VALIDATION=strict|lenient|off` - strict refuses junk, lenient keeps it flagged `needs_review`, off = old behaviour.
 - `ALLOW_DEMO_QUOTE_CATEGORIES=false` - set `true` on staging to let the demo insurers' quotes through for every category.

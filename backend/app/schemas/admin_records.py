@@ -19,6 +19,9 @@ class PolicyListOut(BaseModel):
     end_date: date
     is_mock: bool
     created_at: datetime
+    # One-month sticker only, waiting for the valuation report (premium to be reconciled once it arrives).
+    valuation_pending: bool = False
+    valuation_due: date | None = None
 
 
 class PaymentListOut(BaseModel):

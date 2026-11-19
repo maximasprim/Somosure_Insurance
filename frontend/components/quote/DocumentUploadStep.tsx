@@ -103,8 +103,12 @@ export function DocumentUploadStep({
   }
 
   const isDone = (item: ChecklistItem) => item.state === "provided" || item.state === "auto" || !!uploaded[item.type];
-  const allUploaded = items.every(isDone);
-  const remaining = items.filter((i) => !isDone(i)).length;
+  // Only REQUIRED documents hold up Submit. The valuation report is optional: without it the customer gets a one-month
+  // sticker (see below) instead of annual comprehensive cover.
+  const required = items.filter((i) => !i.optional);
+  const allUploaded = required.every(isDone);
+  const remaining = required.filter((i) => !isDone(i)).length;
+  const withoutValuation = items.some((i) => i.optional && i.type === "valuation_report" && !isDone(i));
 
   return (
     <Card className="flex flex-col gap-5">
@@ -125,6 +129,7 @@ export function DocumentUploadStep({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{doc.label}</span>
+                  {doc.optional && !fresh && !onFile && <Badge>Optional</Badge>}
                   {fresh && <Badge tone="success">Upload Successful</Badge>}
                   {onFile && (
                     <Badge tone="success">
@@ -166,6 +171,17 @@ export function DocumentUploadStep({
           );
         })}
       </div>
+
+      {withoutValuation && (
+        <div role="note" className="rounded-control border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">No valuation report yet? You can still continue.</p>
+          <p className="mt-1">
+            An annual comprehensive policy needs a valuation report. Without one you pay the amount on your quote (based on the vehicle value you
+            entered) and get a <strong>one-month comprehensive sticker</strong> while you get the report. Upload it from your dashboard within
+            the month and we&apos;ll confirm your annual cover and reconcile the premium to the actual value.
+          </p>
+        </div>
+      )}
 
       {error && <p className="text-sm text-status-error">{error}</p>}
 

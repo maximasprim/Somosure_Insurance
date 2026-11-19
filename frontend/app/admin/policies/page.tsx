@@ -18,6 +18,8 @@ interface PolicyRow {
   start_date: string;
   end_date: string;
   is_mock: boolean;
+  valuation_pending?: boolean;
+  valuation_due?: string | null;
 }
 
 const STATUSES = ["quote", "application", "under_review", "approved", "payment_pending", "active", "expired", "cancelled", "renewal_pending", "renewed", "rejected"];
@@ -30,6 +32,8 @@ export default function AdminPoliciesPage() {
   const [policies, setPolicies] = useState<PolicyRow[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [waitingOnly, setWaitingOnly] = useState(false);
+  const [clearing, setClearing] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +44,7 @@ export default function AdminPoliciesPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (status) params.set("status", status);
+      if (waitingOnly) params.set("valuation_pending", "true");
       setPolicies(await api.get<PolicyRow[]>(`/api/v1/admin/policies?${params.toString()}`));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load policies");
@@ -51,7 +56,22 @@ export default function AdminPoliciesPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+  }, [status, waitingOnly]);
+
+  // Clears the "waiting for valuation report" flag. It changes nothing else: the premium is reconciled separately.
+  async function valuationReceived(p: PolicyRow) {
+    if (!window.confirm(`Mark the valuation report for ${p.policy_number} as received?\n\nThis only clears the flag. Reconcile the premium to the actual value separately.`)) return;
+    setClearing(p.id);
+    setError(null);
+    try {
+      await api.post(`/api/v1/admin/policies/${p.id}/valuation-received`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update the policy");
+    } finally {
+      setClearing(null);
+    }
+  }
 
   return (
     <main className="mx-auto max-w-8xl px-3 py-4">
@@ -84,6 +104,10 @@ export default function AdminPoliciesPage() {
             ))}
           </select>
         </div>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input type="checkbox" checked={waitingOnly} onChange={(e) => setWaitingOnly(e.target.checked)} />
+          Waiting for valuation report
+        </label>
         <Button variant="ghost" onClick={load}>
           Search
         </Button>
@@ -101,12 +125,22 @@ export default function AdminPoliciesPage() {
                   <Badge tone="brand">{p.status.replace(/_/g, " ")}</Badge>
                   {p.payment_status !== "paid" && <Badge tone="error">{p.payment_status.replace(/_/g, " ")}</Badge>}
                   {p.is_mock && <Badge tone="neutral">Mock</Badge>}
+                  {p.valuation_pending && (
+                    <Badge tone="info">Valuation pending{p.valuation_due ? ` · one-month sticker to ${p.valuation_due}` : ""}</Badge>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-ink-soft">
                   {p.customer_name} · {p.provider_name} · {p.start_date} to {p.end_date}
                 </p>
               </div>
-              <span className="font-semibold">{formatKES(p.premium)}</span>
+              <div className="flex items-center gap-3">
+                {p.valuation_pending && (
+                  <Button variant="ghost" onClick={() => valuationReceived(p)} disabled={clearing === p.id}>
+                    {clearing === p.id ? "Saving…" : "Valuation received"}
+                  </Button>
+                )}
+                <span className="font-semibold">{formatKES(p.premium)}</span>
+              </div>
             </Card>
           ))}
       </div>

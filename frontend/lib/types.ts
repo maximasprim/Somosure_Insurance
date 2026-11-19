@@ -221,6 +221,10 @@ export interface PolicySummary {
   start_date: string;
   end_date: string;
   is_mock: boolean;
+  /** Comprehensive cover issued without a valuation report: a one-month sticker so far (see ValuationUpload). */
+  application_id?: string | null;
+  valuation_pending?: boolean;
+  valuation_due?: string | null;
 }
 
 export interface DashboardData {
@@ -525,6 +529,8 @@ export interface DocumentRequirement {
   description: string;
   tips: string[];
   system_provided: boolean;
+  /** Can be left out: the application can still be submitted (the valuation report). */
+  optional?: boolean;
 }
 
 export interface DocumentRequirements {
@@ -543,12 +549,14 @@ export interface ChecklistItem {
   tips: string[];
   state: "provided" | "missing" | "auto";
   source: "uploaded" | "insurance_application" | "earlier_application" | "generated" | null;
+  optional?: boolean;
 }
 
 export interface DocumentChecklist {
   items: ChecklistItem[];
-  missing: string[];
-  complete: boolean;
+  missing: string[]; // required documents still needed
+  optional_missing?: string[]; // optional ones not provided (the valuation report)
+  complete: boolean; // nothing REQUIRED is missing
 }
 
 export interface CategoryAvailability {

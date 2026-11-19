@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FileCheck2 } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { api } from "@/lib/api";
 import type { DocumentRequirement, DocumentRequirements } from "@/lib/types";
@@ -58,7 +59,10 @@ export function DocumentChecklistCard({ category, coverType }: { category: strin
       <ul className="flex flex-col gap-3">
         {reqs.insurance.map((doc: DocumentRequirement) => (
           <li key={doc.type} className="rounded-control border border-neutral-border px-4 py-3">
-            <p className="text-sm font-semibold text-ink">{doc.label}</p>
+            <p className="text-sm font-semibold text-ink">
+              {doc.label}
+              {doc.optional && <Badge className="ml-2">Optional</Badge>}
+            </p>
             <p className="mt-0.5 text-sm text-ink-soft">{doc.description}</p>
             {doc.tips.length > 0 && (
               <ul className="mt-1.5 list-disc pl-5 text-xs text-ink-soft">

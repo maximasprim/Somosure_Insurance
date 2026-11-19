@@ -160,5 +160,10 @@ class PolicyOut(BaseModel):
     start_date: date
     end_date: date
     is_mock: bool
+    # Comprehensive cover issued without a valuation report: only a one-month sticker so far, and the customer is asked
+    # for the report (uploaded to `application_id`) by `valuation_due`. See services/provisional_cover.py.
+    application_id: uuid.UUID | None = None
+    valuation_pending: bool = False
+    valuation_due: date | None = None
 
     model_config = {"from_attributes": True}

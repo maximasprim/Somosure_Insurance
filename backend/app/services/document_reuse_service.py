@@ -74,6 +74,7 @@ def _item(spec: DocumentSpec, state: str, source: str | None = None) -> dict:
         "tips": list(spec.tips),
         "state": state,
         "source": source,
+        "optional": spec.optional,
     }
 
 
@@ -406,12 +407,13 @@ async def application_checklist(
                 await db.commit()
                 have = await own_docs()
 
-    items, missing = [], []
+    items, missing, optional_missing = [], [], []
     for spec in specs:
         doc = have.get(spec.type)
         if doc:
             items.append(_item(spec, "provided", _source_from_notes(doc.validation_notes)))
         else:
             items.append(_item(spec, "missing"))
-            missing.append(spec.type)
-    return {"items": items, "missing": missing, "complete": not missing}
+            (optional_missing if spec.optional else missing).append(spec.type)
+    # `complete` only counts what is required: an optional document (the valuation report) can still be outstanding.
+    return {"items": items, "missing": missing, "optional_missing": optional_missing, "complete": not missing}

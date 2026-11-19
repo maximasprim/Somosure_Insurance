@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, get_storage
+from app.services import provisional_cover
 from app.services.document_intake import screen_upload
 from app.models.application import Application, ApplicationDocument, ApplicationEvent
 from app.models.asset import InsuredAsset, Vehicle
@@ -237,6 +238,11 @@ async def submit_application(db: AsyncSession, application_id: str) -> Applicati
 
     quote = await db.get(Quote, application.quote_id)
     provider = await db.get(InsuranceProvider, quote.provider_id) if quote else None
+
+    # No valuation report is allowed (the customer gets a one-month sticker), but not twice for the same vehicle.
+    quote_request = await db.get(QuoteRequest, quote.quote_request_id) if quote else None
+    if await provisional_cover.lacks_valuation(db, application, quote, quote_request):
+        await provisional_cover.ensure_no_open_provisional_cover(db, quote_request)
 
     application.status = "submitted"
     if provider:

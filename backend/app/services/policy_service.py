@@ -10,6 +10,7 @@ from app.models.policy import Policy, PolicyEvent
 from app.models.provider import InsuranceProvider
 from app.models.quote import Quote, QuoteRequest
 from app.providers.registry import get_adapter
+from app.services import provisional_cover
 
 
 async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
@@ -26,6 +27,11 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
 
     result = await adapter.issue_policy(application.provider_reference or application.reference)
 
+    # Comprehensive cover with no valuation report: same policy and premium, but only a one-month sticker, and the policy
+    # is marked so the premium can be reconciled once the report arrives (services/provisional_cover.py).
+    provisional = await provisional_cover.lacks_valuation(db, application, quote, quote_request)
+    sticker_from, sticker_to = provisional_cover.cover_window(date.today())
+
     policy = Policy(
         policy_number=result.policy_number,
         application_id=application.id,
@@ -39,6 +45,9 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
         status="active" if result.status == "active" else "under_review",
         source="website",
         is_mock=result.is_mock,
+        valuation_pending=provisional,
+        valuation_due=sticker_to if provisional else None,
+        provisional_vehicle=provisional_cover.registration_of(quote_request) if provisional else None,
     )
     db.add(policy)
     await db.flush()
@@ -49,7 +58,11 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
             event_type="status_changed",
             from_status=None,
             to_status=policy.status,
-            metadata_json={"provider_reference": result.policy_number, "is_mock": result.is_mock},
+            metadata_json={
+                "provider_reference": result.policy_number,
+                "is_mock": result.is_mock,
+                **({"provisional": True, "sticker_valid_to": sticker_to.isoformat()} if provisional else {}),
+            },
         )
     )
 
@@ -69,6 +82,8 @@ async def issue_policy(db: AsyncSession, application_id: str) -> Policy:
                 "policy_number": policy.policy_number,
                 "customer_id": str(policy.customer_id),
                 "category": quote_request.category if quote_request else None,
+                # Only for a provisional policy: the sticker then covers one month, not the whole term.
+                **({"valid_from": sticker_from.isoformat(), "valid_to": sticker_to.isoformat(), "provisional": True} if provisional else {}),
             },
         )
 

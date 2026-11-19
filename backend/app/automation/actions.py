@@ -94,28 +94,39 @@ async def create_task(db: AsyncSession, context: dict, config: dict) -> dict:
     return {"task_id": str(task.id)}
 
 
+def _as_date(value) -> date | None:
+    """A date, or the ISO text of one (event context is stored as JSON, which has no dates)."""
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(value) if isinstance(value, str) and value else None
+
+
 async def generate_sticker(db: AsyncSession, context: dict, config: dict) -> dict:
     policy_id = context.get("policy_id")
     if not policy_id:
         return {"skipped": "no policy_id in context"}
 
+    valid_from, valid_to = _as_date(context.get("valid_from")), _as_date(context.get("valid_to"))
     reference = f"SOM-STK-{date.today().year}-{''.join(random.choices(string.digits, k=6))}"
     sticker = Sticker(
         reference=reference,
         policy_id=policy_id,
         status="pending",
         qr_payload=f"{reference}|{context.get('policy_number', '')}",
-        valid_from=context.get("valid_from"),
-        valid_to=context.get("valid_to"),
-        # Set only when this sticker is one month of a monthly payment
-        # plan (see payment_service.handle_mpesa_webhook); otherwise both
-        # stay NULL, meaning "covers the whole policy term" as before.
+        valid_from=valid_from,
+        valid_to=valid_to,
+        # Set when this sticker is one month of a monthly payment plan (see
+        # payment_service) or the one-month cover of a policy still waiting for
+        # its valuation report; otherwise both stay NULL, meaning "covers the
+        # whole policy term" as before.
     )
     db.add(sticker)
     await db.flush()
     note = "Auto-created on policy activation"
-    if context.get("valid_from"):
-        note = f"Auto-created for monthly plan cover {context['valid_from']} to {context.get('valid_to')}"
+    if context.get("provisional"):
+        note = f"One-month sticker {valid_from} to {valid_to}: valuation report not yet received"
+    elif valid_from:
+        note = f"Auto-created for monthly plan cover {valid_from} to {valid_to}"
     db.add(StickerEvent(sticker_id=sticker.id, from_status=None, to_status="pending", notes=note))
     return {"sticker_id": str(sticker.id), "reference": reference}
 

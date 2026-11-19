@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
 import { ReferralCard } from "@/components/ReferralCard";
 import { AffiliateCard } from "@/components/AffiliateCard";
+import { ValuationUpload } from "@/components/ValuationUpload";
 import type { AppNotification, DashboardData } from "@/lib/types";
 
 function formatKES(amount: string) {
@@ -222,6 +223,7 @@ export default function DashboardPage() {
                       </p>
                       {p.is_mock && <Badge tone="neutral">Demo policy</Badge>}
                     </div>
+                    {p.valuation_pending && p.application_id && <ValuationUpload applicationId={p.application_id} dueDate={p.valuation_due ?? null} />}
                   </div>
                 ))}
               </div>
